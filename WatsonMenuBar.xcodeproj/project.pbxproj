@@ -1,0 +1,286 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		46754F5D2F8CF799003D5AEE /* WatsonDailyReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46754F5C2F8CF798003D5AEE /* WatsonDailyReport.swift */; };
+		46754F5F2F8CF799003D5AEE /* WatsonDailyReportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46754F5E2F8CF799003D5AEE /* WatsonDailyReportParser.swift */; };
+		4F112D112C41000100000001 /* WatsonMenuBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D012C41000100000001 /* WatsonMenuBarApp.swift */; };
+		4F112D122C41000100000001 /* WatsonStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D022C41000100000001 /* WatsonStatus.swift */; };
+		4F112D132C41000100000001 /* WatsonService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D032C41000100000001 /* WatsonService.swift */; };
+		4F112D142C41000100000001 /* MenuBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D042C41000100000001 /* MenuBarViewModel.swift */; };
+		4F112D152C41000100000001 /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D052C41000100000001 /* MenuBarContentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		46754F5C2F8CF798003D5AEE /* WatsonDailyReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonDailyReport.swift; sourceTree = "<group>"; };
+		46754F5E2F8CF799003D5AEE /* WatsonDailyReportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonDailyReportParser.swift; sourceTree = "<group>"; };
+		4F112D002C41000100000001 /* WatsonMenuBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatsonMenuBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F112D012C41000100000001 /* WatsonMenuBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonMenuBarApp.swift; sourceTree = "<group>"; };
+		4F112D022C41000100000001 /* WatsonStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonStatus.swift; sourceTree = "<group>"; };
+		4F112D032C41000100000001 /* WatsonService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonService.swift; sourceTree = "<group>"; };
+		4F112D042C41000100000001 /* MenuBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarViewModel.swift; sourceTree = "<group>"; };
+		4F112D052C41000100000001 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4F112D0E2C41000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4F112D062C41000100000001 = {
+			isa = PBXGroup;
+			children = (
+				4F112D072C41000100000001 /* WatsonMenuBar */,
+				4F112D082C41000100000001 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4F112D072C41000100000001 /* WatsonMenuBar */ = {
+			isa = PBXGroup;
+			children = (
+				4F112D012C41000100000001 /* WatsonMenuBarApp.swift */,
+				4F112D092C41000100000001 /* Models */,
+				4F112D0A2C41000100000001 /* Services */,
+				4F112D0B2C41000100000001 /* ViewModels */,
+				4F112D0D2C41000100000001 /* Views */,
+			);
+			path = WatsonMenuBar;
+			sourceTree = "<group>";
+		};
+		4F112D082C41000100000001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4F112D002C41000100000001 /* WatsonMenuBar.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4F112D092C41000100000001 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				4F112D022C41000100000001 /* WatsonStatus.swift */,
+				46754F5C2F8CF798003D5AEE /* WatsonDailyReport.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		4F112D0A2C41000100000001 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				4F112D032C41000100000001 /* WatsonService.swift */,
+				46754F5E2F8CF799003D5AEE /* WatsonDailyReportParser.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		4F112D0B2C41000100000001 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				4F112D042C41000100000001 /* MenuBarViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		4F112D0D2C41000100000001 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				4F112D052C41000100000001 /* MenuBarContentView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4F112D0C2C41000100000001 /* WatsonMenuBar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F112D1A2C41000100000001 /* Build configuration list for PBXNativeTarget "WatsonMenuBar" */;
+			buildPhases = (
+				4F112D0F2C41000100000001 /* Sources */,
+				4F112D0E2C41000100000001 /* Frameworks */,
+				4F112D102C41000100000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WatsonMenuBar;
+			productName = WatsonMenuBar;
+			productReference = 4F112D002C41000100000001 /* WatsonMenuBar.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4F112D162C41000100000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					4F112D0C2C41000100000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 4F112D172C41000100000001 /* Build configuration list for PBXProject "WatsonMenuBar" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4F112D062C41000100000001;
+			productRefGroup = 4F112D082C41000100000001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4F112D0C2C41000100000001 /* WatsonMenuBar */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4F112D102C41000100000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4F112D0F2C41000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F112D112C41000100000001 /* WatsonMenuBarApp.swift in Sources */,
+				46754F5D2F8CF799003D5AEE /* WatsonDailyReport.swift in Sources */,
+				4F112D122C41000100000001 /* WatsonStatus.swift in Sources */,
+				4F112D132C41000100000001 /* WatsonService.swift in Sources */,
+				4F112D142C41000100000001 /* MenuBarViewModel.swift in Sources */,
+				4F112D152C41000100000001 /* MenuBarContentView.swift in Sources */,
+				46754F5F2F8CF799003D5AEE /* WatsonDailyReportParser.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		4F112D182C41000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		4F112D192C41000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		4F112D1B2C41000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3X429L2F57;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.michitime.WatsonMenuBar;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		4F112D1C2C41000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3X429L2F57;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.michitime.WatsonMenuBar;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4F112D172C41000100000001 /* Build configuration list for PBXProject "WatsonMenuBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F112D182C41000100000001 /* Debug */,
+				4F112D192C41000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4F112D1A2C41000100000001 /* Build configuration list for PBXNativeTarget "WatsonMenuBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F112D1B2C41000100000001 /* Debug */,
+				4F112D1C2C41000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 4F112D162C41000100000001 /* Project object */;
+}

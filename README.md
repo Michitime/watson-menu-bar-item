@@ -1,2 +1,41 @@
-# watson-menu-bar-item
-Menu Bar Item for the known free Time Tracker Watson
+# WatsonMenuBar
+
+A standalone native macOS menu bar companion for the Watson CLI time tracker.
+It does not replace Watson or recreate reporting screens. It keeps the common
+daily actions close at hand: check status, start a frame, stop a frame, and
+refresh.
+
+## Features
+
+- Menu bar only app built with SwiftUI `MenuBarExtra`
+- Native macOS agent app with no Dock icon
+- Uses `Process` and `Pipe` to call the Watson CLI
+- Detects `watson` in PATH, `/opt/homebrew/bin/watson`, and `/usr/local/bin/watson`
+- Supports `watson status`, `watson start <project> [tags...]`, `watson stop`, and the current-day log summary
+- Shows running or idle state, current project, tags, and elapsed text
+- Shows a compact `Today` list from the current day's Watson log
+- Persists the last project and tags with `AppStorage`
+- Refreshes on launch, after start/stop actions, on manual refresh, and every 1 minute
+- No third-party dependencies
+
+## Build
+
+1. Install Watson separately, for example with `brew install watson`.
+2. Open `WatsonMenuBar.xcodeproj` in Xcode.
+3. Run the `WatsonMenuBar` scheme.
+
+The app targets macOS 13.0 or later and runs as a menu bar utility via
+`LSUIElement`.
+
+## File Structure
+
+- `WatsonMenuBar/WatsonMenuBarApp.swift`: App entry and `MenuBarExtra` scene
+- `WatsonMenuBar/Models/WatsonStatus.swift`: Running, idle, unavailable, and error state model
+- `WatsonMenuBar/Services/WatsonService.swift`: Watson executable discovery and CLI command execution
+- `WatsonMenuBar/ViewModels/MenuBarViewModel.swift`: Refresh loop, menu bar label state, and actions
+- `WatsonMenuBar/Views/MenuBarContentView.swift`: Compact SwiftUI companion UI
+
+## Notes
+
+- The UI is intentionally small and focused on quick daily use.
+- Watson stays the source of truth. This app only talks to it through the CLI.

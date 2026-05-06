@@ -1,0 +1,207 @@
+import SwiftUI
+
+struct MenuBarContentView: View {
+    @ObservedObject var viewModel: MenuBarViewModel
+    @AppStorage("lastProject") private var project = ""
+    @AppStorage("lastTags") private var tags = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            statusHeader
+            Divider()
+            inputSection
+            actionRow
+            todayLogSection
+
+            Divider()
+
+            Button("Quit WatsonMenuBar") {
+                NSApplication.shared.terminate(nil)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+
+            if let footerText = viewModel.footerText {
+                Text(footerText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(viewModel.footerIsError ? Color.red : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .frame(width: 340)
+    }
+
+    private var statusHeader: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(accentColor.opacity(0.16))
+
+                Image(systemName: headerSymbolName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(accentColor)
+            }
+            .frame(width: 30, height: 30)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(viewModel.status.displayTitle)
+                        .font(.system(size: 13, weight: .semibold))
+
+                    if viewModel.isWorking {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.75)
+                    }
+                }
+
+                if let primaryLine = viewModel.status.primaryLine {
+                    Text(primaryLine)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                if let tagsLine = viewModel.status.tagsLine {
+                    Text(tagsLine)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            if viewModel.status.isRunning, let elapsed = viewModel.status.elapsed {
+                Text(elapsed)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var inputSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Project")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextField("Project name", text: $project)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!viewModel.canEditInputs)
+                    .onSubmit(startTracking)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Tags")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextField("feature, review, cli", text: $tags)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!viewModel.canEditInputs)
+                    .onSubmit(startTracking)
+            }
+
+            Text("Separate tags with spaces or commas.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: 8) {
+            Button("Start", action: startTracking)
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!viewModel.canStart || project.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            Button("Stop", action: stopTracking)
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.canStop)
+
+            Spacer()
+
+            Button("Refresh", action: refresh)
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.canRefresh)
+        }
+    }
+
+    @ViewBuilder
+    private var todayLogSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Today")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Group {
+                if !viewModel.status.todayReport.summaries.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(viewModel.status.todayReport.summaries) { summary in
+                            Text(summary.displayText)
+                                .font(.system(size: 11))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                } else {
+                    Text("No entries recorded today.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(10)
+            .background(Color.secondary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+    }
+
+    private var accentColor: Color {
+        switch viewModel.status.state {
+        case .running:
+            return .green
+        case .idle:
+            return .secondary
+        case .loading:
+            return .blue
+        case .unavailable, .error:
+            return .red
+        }
+    }
+
+    private var headerSymbolName: String {
+        switch viewModel.status.state {
+        case .running:
+            return "play.fill"
+        case .idle:
+            return "pause.fill"
+        case .loading:
+            return "arrow.triangle.2.circlepath"
+        case .unavailable, .error:
+            return "exclamationmark"
+        }
+    }
+
+    private func startTracking() {
+        Task {
+            await viewModel.start(project: project, tagsInput: tags)
+        }
+    }
+
+    private func stopTracking() {
+        Task {
+            await viewModel.stop()
+        }
+    }
+
+    private func refresh() {
+        Task {
+            await viewModel.refresh()
+        }
+    }
+}

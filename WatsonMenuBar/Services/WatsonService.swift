@@ -1,0 +1,251 @@
+import Foundation
+
+struct WatsonService {
+    enum ServiceError: LocalizedError {
+        case executableNotFound
+        case commandFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .executableNotFound:
+                return "Watson CLI is not installed. Install it and make sure `watson` is available in PATH, /opt/homebrew/bin, or /usr/local/bin."
+            case .commandFailed(let message):
+                return message
+            }
+        }
+    }
+
+    private let idleMessage = "No project started."
+    private let fileManager = FileManager.default
+    private let dailyReportParser = WatsonDailyReportParser()
+
+    func fetchStatus() async -> WatsonStatus {
+        guard let executable = resolveExecutablePath() else {
+            return .unavailable()
+        }
+
+        do {
+            let statusResult = try await run(executable: executable, arguments: ["status"])
+            let statusText = cleaned(statusResult.combinedOutput)
+
+            guard statusResult.exitCode == 0 else {
+                return .error(
+                    statusText.isEmpty ? "Watson returned an unexpected response." : statusText,
+                    executablePath: executable
+                )
+            }
+
+            let projectResult = try await run(executable: executable, arguments: ["status", "--project"])
+            let tagsResult = try await run(executable: executable, arguments: ["status", "--tags"])
+            let elapsedResult = try await run(executable: executable, arguments: ["status", "--elapsed"])
+            let logResult = try await run(executable: executable, arguments: ["log", "--day", "--current", "--no-pager"])
+
+            if let failedResult = [projectResult, tagsResult, elapsedResult, logResult].first(where: { $0.exitCode != 0 }) {
+                return .error(
+                    commandFailureMessage(from: failedResult, fallback: "Unable to read Watson status."),
+                    executablePath: executable
+                )
+            }
+
+            let projectText = cleaned(projectResult.combinedOutput)
+            let tagsText = cleaned(tagsResult.combinedOutput)
+            let elapsedText = cleaned(elapsedResult.combinedOutput)
+            let logText = cleaned(logResult.combinedOutput)
+            let todayReport = parsedTodayReport(from: logText)
+
+            if projectText == idleMessage || elapsedText == idleMessage {
+                return WatsonStatus(
+                    state: .idle,
+                    project: nil,
+                    tags: [],
+                    elapsed: nil,
+                    todayReport: todayReport,
+                    message: nil,
+                    executablePath: executable
+                )
+            }
+
+            return .running(
+                project: projectText.isEmpty ? "Unknown project" : projectText,
+                tags: parseTags(from: tagsText),
+                elapsed: elapsedText.isEmpty ? nil : elapsedText,
+                todayReport: todayReport,
+                executablePath: executable
+            )
+        } catch let error as ServiceError {
+            switch error {
+            case .executableNotFound:
+                return .unavailable()
+            case .commandFailed(let message):
+                return .error(message, executablePath: executable)
+            }
+        } catch {
+            return .error(error.localizedDescription, executablePath: executable)
+        }
+    }
+
+    func start(project: String, tagsInput: String) async throws {
+        let normalizedProject = project.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedProject.isEmpty else {
+            throw ServiceError.commandFailed("Enter a project name before starting Watson.")
+        }
+
+        let executable = try executablePath()
+        let tagArguments = tokenizeTags(tagsInput).map { "+\($0)" }
+        let result = try await run(executable: executable, arguments: ["start", normalizedProject] + tagArguments)
+
+        guard result.exitCode == 0 else {
+            throw ServiceError.commandFailed(
+                commandFailureMessage(from: result, fallback: "Unable to start Watson.")
+            )
+        }
+    }
+
+    func stop() async throws {
+        let executable = try executablePath()
+        let result = try await run(executable: executable, arguments: ["stop"])
+
+        guard result.exitCode == 0 else {
+            throw ServiceError.commandFailed(
+                commandFailureMessage(from: result, fallback: "Unable to stop Watson.")
+            )
+        }
+    }
+
+    private func executablePath() throws -> String {
+        guard let path = resolveExecutablePath() else {
+            throw ServiceError.executableNotFound
+        }
+
+        return path
+    }
+
+    private func resolveExecutablePath() -> String? {
+        if let pathExecutable = resolveFromPATH(named: "watson") {
+            return pathExecutable
+        }
+
+        for candidate in ["/opt/homebrew/bin/watson", "/usr/local/bin/watson"] where fileManager.isExecutableFile(atPath: candidate) {
+            return candidate
+        }
+
+        return nil
+    }
+
+    private func resolveFromPATH(named executable: String) -> String? {
+        let pathValue = ProcessInfo.processInfo.environment["PATH"] ?? ""
+
+        for directory in pathValue.split(separator: ":") {
+            let candidate = String(directory) + "/" + executable
+            if fileManager.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+
+        return nil
+    }
+
+    private func tokenizeTags(_ text: String) -> [String] {
+        var seen = Set<String>()
+        let normalized = text.replacingOccurrences(of: ",", with: " ")
+
+        return normalized
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "+")) }
+            .filter { !$0.isEmpty }
+            .filter { seen.insert($0).inserted }
+    }
+
+    private func parseTags(from text: String) -> [String] {
+        guard !text.isEmpty else {
+            return []
+        }
+
+        guard text.hasPrefix("[") && text.hasSuffix("]") else {
+            return [text]
+        }
+
+        let inner = text.dropFirst().dropLast()
+
+        return inner
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    }
+
+    private func commandFailureMessage(from result: CommandResult, fallback: String) -> String {
+        let message = cleaned(result.combinedOutput)
+        return message.isEmpty ? fallback : message
+    }
+
+    private func cleaned(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func processEnvironment() -> [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+
+        // Xcode injects preview/debug dyld variables that break Python-based CLIs like Watson.
+        environment.removeValue(forKey: "DYLD_INSERT_LIBRARIES")
+        environment.removeValue(forKey: "DYLD_FRAMEWORK_PATH")
+        environment.removeValue(forKey: "DYLD_LIBRARY_PATH")
+
+        return environment
+    }
+
+    private func parsedTodayReport(from text: String) -> WatsonDailyReport {
+        guard !text.isEmpty else {
+            return WatsonDailyReport(entries: [])
+        }
+
+        if text.localizedCaseInsensitiveContains("No logged time") {
+            return WatsonDailyReport(entries: [])
+        }
+
+        return dailyReportParser.parse(text)
+    }
+
+    private func run(executable: String, arguments: [String]) async throws -> CommandResult {
+        try await Task.detached(priority: .userInitiated) {
+            let process = Process()
+            let stdout = Pipe()
+            let stderr = Pipe()
+            let stdin = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = arguments
+            process.environment = processEnvironment()
+            process.standardOutput = stdout
+            process.standardError = stderr
+            process.standardInput = stdin
+
+            try process.run()
+            stdin.fileHandleForWriting.closeFile()
+            process.waitUntilExit()
+
+            let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
+            let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
+
+            return CommandResult(
+                exitCode: process.terminationStatus,
+                stdout: String(decoding: stdoutData, as: UTF8.self),
+                stderr: String(decoding: stderrData, as: UTF8.self)
+            )
+        }.value
+    }
+}
+
+private struct CommandResult {
+    let exitCode: Int32
+    let stdout: String
+    let stderr: String
+
+    var combinedOutput: String {
+        [stdout, stderr]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+    }
+}
