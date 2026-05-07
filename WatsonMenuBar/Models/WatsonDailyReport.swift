@@ -64,7 +64,23 @@ enum WatsonDurationFormatter {
             return "\(totalSeconds) \(totalSeconds == 1 ? "second" : "seconds")"
         }
 
-        let minutes = totalSeconds / 60
-        return "\(minutes) \(minutes == 1 ? "minute" : "minutes")"
+        let totalMinutes = totalSeconds / 60
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+
+        if hours == 0 {
+            return unitString(value: minutes, singular: "minute")
+        }
+
+        if minutes == 0 {
+            return unitString(value: hours, singular: "hour")
+        }
+
+        return "\(unitString(value: hours, singular: "hour")) \(unitString(value: minutes, singular: "minute"))"
+    }
+
+    private static func unitString(value: Int, singular: String) -> String {
+        let label = value == 1 ? singular : singular + "s"
+        return "\(value) \(label)"
     }
 }
