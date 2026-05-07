@@ -15,11 +15,19 @@ struct MenuBarContentView: View {
 
             Divider()
 
-            Button("Quit WatsonMenuBar") {
+            settingsSection
+
+            Divider()
+
+            Button {
                 NSApplication.shared.terminate(nil)
+            } label: {
+                Label("Quit WatsonMenuBar", systemImage: "power")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
 
             if let footerText = viewModel.footerText {
                 Text(footerText)
@@ -161,6 +169,38 @@ struct MenuBarContentView: View {
         }
     }
 
+    private var settingsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Text("Launch at Login")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            .frame(maxWidth: .infinity)
+
+            if let statusText = viewModel.launchAtLoginStatusText {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(statusText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(viewModel.launchAtLoginNeedsApproval ? .orange : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if viewModel.launchAtLoginNeedsApproval {
+                        Button("Open Login Items") {
+                            viewModel.openLoginItemsSettings()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                    }
+                }
+            }
+        }
+    }
+
     private var accentColor: Color {
         switch viewModel.status.state {
         case .running:
@@ -203,5 +243,12 @@ struct MenuBarContentView: View {
         Task {
             await viewModel.refresh()
         }
+    }
+
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.launchAtLoginIsOn },
+            set: { viewModel.setLaunchAtLogin($0) }
+        )
     }
 }

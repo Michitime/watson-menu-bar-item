@@ -15,6 +15,7 @@ refresh.
 - Shows running or idle state, current project, tags, and elapsed text
 - Shows a compact `Today` list from the current day's Watson log
 - Persists the last project and tags with `AppStorage`
+- Offers a dropdown switch to launch the app at login
 - Refreshes on launch, after start/stop actions, on manual refresh, and every 1 minute
 - No third-party dependencies
 

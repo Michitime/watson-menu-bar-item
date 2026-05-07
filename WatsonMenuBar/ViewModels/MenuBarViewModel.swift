@@ -1,10 +1,14 @@
 import Foundation
+import ServiceManagement
 
 @MainActor
 final class MenuBarViewModel: ObservableObject {
     @Published private(set) var status: WatsonStatus = .loading
     @Published private(set) var isWorking = false
     @Published private(set) var inlineMessage: String?
+    @Published private(set) var launchAtLoginIsOn = false
+    @Published private(set) var launchAtLoginNeedsApproval = false
+    @Published private(set) var launchAtLoginStatusText: String?
 
     private let service: WatsonService
     private var refreshTask: Task<Void, Never>?
@@ -12,6 +16,7 @@ final class MenuBarViewModel: ObservableObject {
 
     init(service: WatsonService = WatsonService()) {
         self.service = service
+        refreshLaunchAtLoginStatus()
         startRefreshing()
     }
 
@@ -120,6 +125,31 @@ final class MenuBarViewModel: ObservableObject {
         }
     }
 
+    func setLaunchAtLogin(_ isOn: Bool) {
+        launchAtLoginStatusText = nil
+        var operationError: String?
+
+        do {
+            if isOn {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            operationError = error.localizedDescription
+        }
+
+        refreshLaunchAtLoginStatus()
+
+        if let operationError {
+            launchAtLoginStatusText = operationError
+        }
+    }
+
+    func openLoginItemsSettings() {
+        SMAppService.openSystemSettingsLoginItems()
+    }
+
     private func startRefreshing() {
         guard refreshTask == nil else {
             return
@@ -172,6 +202,31 @@ final class MenuBarViewModel: ObservableObject {
 
         status = await service.fetchStatus()
         isWorking = false
+    }
+
+    private func refreshLaunchAtLoginStatus() {
+        switch SMAppService.mainApp.status {
+        case .enabled:
+            launchAtLoginIsOn = true
+            launchAtLoginNeedsApproval = false
+            launchAtLoginStatusText = nil
+        case .requiresApproval:
+            launchAtLoginIsOn = true
+            launchAtLoginNeedsApproval = true
+            launchAtLoginStatusText = "Approve launch at login in System Settings."
+        case .notRegistered:
+            launchAtLoginIsOn = false
+            launchAtLoginNeedsApproval = false
+            launchAtLoginStatusText = nil
+        case .notFound:
+            launchAtLoginIsOn = false
+            launchAtLoginNeedsApproval = false
+            launchAtLoginStatusText = "Launch at login is unavailable for this build."
+        @unknown default:
+            launchAtLoginIsOn = false
+            launchAtLoginNeedsApproval = false
+            launchAtLoginStatusText = "Unable to read launch at login status."
+        }
     }
 
     private func shortElapsed(from text: String?) -> String? {
