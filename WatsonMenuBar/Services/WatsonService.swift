@@ -51,7 +51,8 @@ struct WatsonService {
             let tagsText = cleaned(tagsResult.combinedOutput)
             let elapsedText = cleaned(elapsedResult.combinedOutput)
             let logText = cleaned(logResult.combinedOutput)
-            let todayReport = parsedTodayReport(from: logText)
+            let todayReport = parsedReport(from: logText)
+            let workWeekReport = try await fetchWorkWeekReport(executable: executable)
 
             if projectText == idleMessage || elapsedText == idleMessage {
                 return WatsonStatus(
@@ -60,6 +61,7 @@ struct WatsonService {
                     tags: [],
                     elapsed: nil,
                     todayReport: todayReport,
+                    workWeekReport: workWeekReport,
                     message: nil,
                     executablePath: executable
                 )
@@ -70,6 +72,7 @@ struct WatsonService {
                 tags: parseTags(from: tagsText),
                 elapsed: elapsedText.isEmpty ? nil : elapsedText,
                 todayReport: todayReport,
+                workWeekReport: workWeekReport,
                 executablePath: executable
             )
         } catch let error as ServiceError {
@@ -195,7 +198,66 @@ struct WatsonService {
         return environment
     }
 
-    private func parsedTodayReport(from text: String) -> WatsonDailyReport {
+    private func fetchWorkWeekReport(executable: String) async throws -> WatsonWorkWeekReport {
+        var dayReports: [WatsonWorkWeekDayReport] = []
+
+        for date in currentWorkWeekDates() {
+            let dateArgument = watsonDateString(from: date)
+            let result = try await run(
+                executable: executable,
+                arguments: ["log", "--from", dateArgument, "--to", dateArgument, "--current", "--no-pager"]
+            )
+
+            guard result.exitCode == 0 else {
+                throw ServiceError.commandFailed(
+                    commandFailureMessage(from: result, fallback: "Unable to read Watson work week.")
+                )
+            }
+
+            dayReports.append(
+                WatsonWorkWeekDayReport(
+                    date: date,
+                    report: parsedReport(from: cleaned(result.combinedOutput))
+                )
+            )
+        }
+
+        return WatsonWorkWeekReport(days: dayReports)
+    }
+
+    private func currentWorkWeekDates(referenceDate: Date = Date(), calendar baseCalendar: Calendar = .current) -> [Date] {
+        var calendar = baseCalendar
+        calendar.firstWeekday = 2
+
+        let today = calendar.startOfDay(for: referenceDate)
+        let weekday = calendar.component(.weekday, from: today)
+        let daysSinceMonday = (weekday + 5) % 7
+
+        guard let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) else {
+            return []
+        }
+
+        let dayOffsetLimit = min(daysSinceMonday, 4)
+        return (0...dayOffsetLimit).compactMap { offset in
+            calendar.date(byAdding: .day, value: offset, to: monday)
+        }
+    }
+
+    private func watsonDateString(from date: Date, calendar: Calendar = .current) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+
+        guard
+            let year = components.year,
+            let month = components.month,
+            let day = components.day
+        else {
+            return ""
+        }
+
+        return String(format: "%04d-%02d-%02d", year, month, day)
+    }
+
+    private func parsedReport(from text: String) -> WatsonDailyReport {
         guard !text.isEmpty else {
             return WatsonDailyReport(entries: [])
         }

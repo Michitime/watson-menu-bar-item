@@ -3,6 +3,10 @@ import Foundation
 struct WatsonDailyReport: Equatable {
     let entries: [WatsonDailyEntry]
 
+    var totalDurationInSeconds: Int {
+        entries.reduce(0) { $0 + $1.durationInSeconds }
+    }
+
     var summaries: [WatsonDailySummary] {
         var orderedKeys: [WatsonDailySummary.Key] = []
         var totalsByKey: [WatsonDailySummary.Key: Int] = [:]
@@ -26,6 +30,21 @@ struct WatsonDailyReport: Equatable {
                 totalDurationInSeconds: totalDuration
             )
         }
+    }
+}
+
+struct WatsonWorkWeekReport: Equatable {
+    let days: [WatsonWorkWeekDayReport]
+
+    static let empty = WatsonWorkWeekReport(days: [])
+}
+
+struct WatsonWorkWeekDayReport: Equatable, Identifiable {
+    let date: Date
+    let report: WatsonDailyReport
+
+    var id: Date {
+        date
     }
 }
 

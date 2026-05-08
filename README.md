@@ -11,9 +11,10 @@ refresh.
 - Native macOS agent app with no Dock icon
 - Uses `Process` and `Pipe` to call the Watson CLI
 - Detects `watson` in PATH, `/opt/homebrew/bin/watson`, and `/usr/local/bin/watson`
-- Supports `watson status`, `watson start <project> [tags...]`, `watson stop`, and the current-day log summary
+- Supports `watson status`, `watson start <project> [tags...]`, `watson stop`, current-day log summary, and current work-week summaries
 - Shows running or idle state, current project, tags, and elapsed text
 - Shows a compact `Today` list from the current day's Watson log
+- Shows a collapsible `Work Week` list from Monday through today, capped at Friday
 - Persists the last project and tags with `AppStorage`
 - Offers a dropdown switch to launch the app at login
 - Refreshes on launch, after start/stop actions, on manual refresh, and every 1 minute
