@@ -4,6 +4,7 @@ struct MenuBarContentView: View {
     @ObservedObject var viewModel: MenuBarViewModel
     @AppStorage("lastProject") private var project = ""
     @AppStorage("lastTags") private var tags = ""
+    @AppStorage("workWeekExpanded") private var workWeekExpanded = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -12,6 +13,7 @@ struct MenuBarContentView: View {
             inputSection
             actionRow
             todayLogSection
+            workWeekSection
 
             Divider()
 
@@ -169,6 +171,76 @@ struct MenuBarContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var workWeekSection: some View {
+        DisclosureGroup(isExpanded: $workWeekExpanded) {
+            VStack(alignment: .leading, spacing: 8) {
+                if viewModel.status.workWeekReport.days.isEmpty {
+                    Text("No work week data available.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ForEach(viewModel.status.workWeekReport.days) { day in
+                        workWeekDay(day)
+
+                        if day.id != viewModel.status.workWeekReport.days.last?.id {
+                            workWeekDaySeparator
+                        }
+                    }
+                }
+            }
+            .padding(.top, 8)
+        } label: {
+            Label("Week", systemImage: "list.bullet")
+                .font(.system(size: 12, weight: .semibold))
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func workWeekDay(_ day: WatsonWorkWeekDayReport) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(day.date, format: .dateTime.weekday(.wide))
+                    .font(.system(size: 12, weight: .semibold))
+
+                Text(day.date, format: .dateTime.month(.abbreviated).day())
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 8)
+
+                Text(workWeekTotalText(for: day.report))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            if !day.report.summaries.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(day.report.summaries) { summary in
+                        Text(summary.displayText)
+                            .font(.system(size: 11))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            } else {
+                Text("No entries recorded.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var workWeekDaySeparator: some View {
+        Rectangle()
+            .fill(Color.secondary.opacity(0.18))
+            .frame(height: 1)
+            .padding(.vertical, 2)
+    }
+
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
@@ -250,5 +322,13 @@ struct MenuBarContentView: View {
             get: { viewModel.launchAtLoginIsOn },
             set: { viewModel.setLaunchAtLogin($0) }
         )
+    }
+
+    private func workWeekTotalText(for report: WatsonDailyReport) -> String {
+        guard report.totalDurationInSeconds > 0 else {
+            return "No time"
+        }
+
+        return WatsonDurationFormatter.displayString(for: report.totalDurationInSeconds)
     }
 }
