@@ -114,13 +114,45 @@ struct MenuBarContentView: View {
                 TextField("feature, review, cli", text: $tags)
                     .textFieldStyle(.roundedBorder)
                     .disabled(!viewModel.canEditInputs)
+                    .onChange(of: tags) { newValue in
+                        let normalized = normalizedTagsInput(newValue)
+                        if normalized != newValue {
+                            tags = normalized
+                        }
+                    }
                     .onSubmit(startTracking)
             }
 
-            Text("Separate tags with spaces or commas.")
+            Text("Separate tags with commas or semicolons.\nSpaces become hyphens.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private func normalizedTagsInput(_ text: String) -> String {
+        var normalized = ""
+
+        for character in text {
+            if character == "," || character == ";" {
+                while normalized.last == "-" {
+                    normalized.removeLast()
+                }
+                normalized.append(character)
+                continue
+            }
+
+            if character.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) {
+                if let last = normalized.last, last != "-" && last != "," && last != ";" {
+                    normalized.append("-")
+                }
+                continue
+            }
+
+            normalized.append(character)
+        }
+
+        return normalized
     }
 
     private var actionRow: some View {

@@ -150,14 +150,23 @@ struct WatsonService {
 
     private func tokenizeTags(_ text: String) -> [String] {
         var seen = Set<String>()
-        let normalized = text.replacingOccurrences(of: ",", with: " ")
 
-        return normalized
-            .split(whereSeparator: \.isWhitespace)
-            .map(String.init)
-            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "+")) }
+        return text
+            .split { $0 == "," || $0 == ";" }
+            .map(normalizedTag)
             .filter { !$0.isEmpty }
             .filter { seen.insert($0).inserted }
+    }
+
+    private func normalizedTag(_ text: Substring) -> String {
+        let plusCharacters = CharacterSet(charactersIn: "+")
+        return text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+            .map { $0.trimmingCharacters(in: plusCharacters) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
     }
 
     private func parseTags(from text: String) -> [String] {
