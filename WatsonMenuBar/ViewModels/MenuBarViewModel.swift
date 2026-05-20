@@ -52,9 +52,9 @@ final class MenuBarViewModel: ObservableObject {
     var menuBarSymbolName: String {
         switch status.state {
         case .running:
-            return "record.circle"
+            return "square.and.pencil"
         case .idle:
-            return "pause.circle"
+            return "cup.and.saucer.fill"
         case .loading:
             return "hourglass.circle"
         case .unavailable, .error:
@@ -82,7 +82,7 @@ final class MenuBarViewModel: ObservableObject {
 
             return components.isEmpty ? nil : components.joined(separator: " ")
         case .idle:
-            return showProject || showTimer ? "Idle" : nil
+            return showProject || showTimer ? "On break" : nil
         case .loading:
             return showProject || showTimer ? "..." : nil
         case .unavailable:

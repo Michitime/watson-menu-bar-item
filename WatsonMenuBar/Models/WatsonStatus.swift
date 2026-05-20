@@ -103,7 +103,7 @@ struct WatsonStatus: Equatable {
         case .running:
             return "Tracking now"
         case .idle:
-            return "Idle"
+            return "On break"
         case .unavailable:
             return "Watson not found"
         case .error:
@@ -118,7 +118,7 @@ struct WatsonStatus: Equatable {
         case .running:
             return project
         case .idle:
-            return "No active frame."
+            return "No active project."
         case .unavailable, .error:
             return message
         }
