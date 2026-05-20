@@ -5,6 +5,8 @@ struct MenuBarContentView: View {
     @AppStorage("lastProject") private var project = ""
     @AppStorage("lastTags") private var tags = ""
     @AppStorage("workWeekExpanded") private var workWeekExpanded = true
+    @AppStorage(AppStorageKeys.showTrackingInMenuBar) private var showTimerInMenuBar = true
+    @AppStorage(AppStorageKeys.showProjectInMenuBar) private var showProjectInMenuBar = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -275,6 +277,26 @@ struct MenuBarContentView: View {
 
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Text("Show Timer in Menu Bar")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Toggle("Show Timer in Menu Bar", isOn: $showTimerInMenuBar)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 12) {
+                Text("Show Project in Menu Bar")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Toggle("Show Project in Menu Bar", isOn: $showProjectInMenuBar)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            .frame(maxWidth: .infinity)
+
             HStack(spacing: 12) {
                 Text("Launch at Login")
                     .font(.system(size: 12, weight: .medium))
