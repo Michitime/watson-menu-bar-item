@@ -298,6 +298,40 @@ struct MenuBarContentView: View {
             .frame(maxWidth: .infinity)
 
             HStack(spacing: 12) {
+                Text("Auto Stop")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Toggle("Auto Stop", isOn: autoStopBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            .frame(maxWidth: .infinity)
+
+            if viewModel.autoStopIsOn {
+                HStack(spacing: 12) {
+                    Text("Stop Time")
+                        .font(.system(size: 12, weight: .medium))
+
+                    Spacer()
+
+                    DatePicker("Stop Time", selection: autoStopTimeBinding, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .datePickerStyle(.field)
+                        .controlSize(.regular)
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 108, alignment: .trailing)
+                }
+                .frame(maxWidth: .infinity)
+
+                if let statusText = viewModel.autoStopStatusText {
+                    Text(statusText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(viewModel.autoStopStatusIsError ? .orange : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 12) {
                 Text("Launch at Login")
                     .font(.system(size: 12, weight: .medium))
                 Spacer()
@@ -375,6 +409,20 @@ struct MenuBarContentView: View {
         Binding(
             get: { viewModel.launchAtLoginIsOn },
             set: { viewModel.setLaunchAtLogin($0) }
+        )
+    }
+
+    private var autoStopBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.autoStopIsOn },
+            set: { viewModel.setAutoStop($0) }
+        )
+    }
+
+    private var autoStopTimeBinding: Binding<Date> {
+        Binding(
+            get: { viewModel.autoStopTime },
+            set: { viewModel.setAutoStopTime($0) }
         )
     }
 

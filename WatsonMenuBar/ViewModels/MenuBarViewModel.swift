@@ -4,6 +4,9 @@ import ServiceManagement
 enum AppStorageKeys {
     static let showTrackingInMenuBar = "showTrackingInMenuBar"
     static let showProjectInMenuBar = "showProjectInMenuBar"
+    static let autoStopEnabled = "autoStopEnabled"
+    static let autoStopSecondsSinceMidnight = "autoStopSecondsSinceMidnight"
+    static let autoStopTargetTimestamp = "autoStopTargetTimestamp"
 }
 
 @MainActor
@@ -14,18 +17,27 @@ final class MenuBarViewModel: ObservableObject {
     @Published private(set) var launchAtLoginIsOn = false
     @Published private(set) var launchAtLoginNeedsApproval = false
     @Published private(set) var launchAtLoginStatusText: String?
+    @Published private(set) var autoStopIsOn = false
+    @Published private(set) var autoStopTime = Date()
+    @Published private(set) var autoStopStatusText: String?
+    @Published private(set) var autoStopStatusIsError = false
     @Published private var currentDate = Date()
 
     private let service: WatsonService
+    private let defaults: UserDefaults
     private var refreshTask: Task<Void, Never>?
     private var counterTask: Task<Void, Never>?
+    private var autoStopTask: Task<Void, Never>?
     private var elapsedBaselineSeconds: TimeInterval?
     private var elapsedBaselineDate: Date?
     private static let refreshIntervalNanoseconds: UInt64 = 60_000_000_000
     private static let counterIntervalNanoseconds: UInt64 = 1_000_000_000
+    private static let defaultAutoStopSecondsSinceMidnight = 17 * 3_600
 
-    init(service: WatsonService = WatsonService()) {
+    init(service: WatsonService = WatsonService(), defaults: UserDefaults = .standard) {
         self.service = service
+        self.defaults = defaults
+        refreshAutoStopState()
         refreshLaunchAtLoginStatus()
         startRefreshing()
         startCounter()
@@ -34,6 +46,7 @@ final class MenuBarViewModel: ObservableObject {
     deinit {
         refreshTask?.cancel()
         counterTask?.cancel()
+        autoStopTask?.cancel()
     }
 
     var menuBarSymbolName: String {
@@ -164,6 +177,29 @@ final class MenuBarViewModel: ObservableObject {
         }
     }
 
+    func setAutoStop(_ isOn: Bool) {
+        autoStopIsOn = isOn
+        defaults.set(isOn, forKey: AppStorageKeys.autoStopEnabled)
+
+        if isOn {
+            updateAutoStopSchedule()
+        } else {
+            cancelAutoStopSchedule()
+            defaults.removeObject(forKey: AppStorageKeys.autoStopTargetTimestamp)
+            autoStopStatusText = nil
+            autoStopStatusIsError = false
+        }
+    }
+
+    func setAutoStopTime(_ date: Date) {
+        autoStopTime = dateForToday(secondsSinceMidnight: secondsSinceMidnight(from: date))
+        defaults.set(secondsSinceMidnight(from: autoStopTime), forKey: AppStorageKeys.autoStopSecondsSinceMidnight)
+
+        if autoStopIsOn {
+            updateAutoStopSchedule()
+        }
+    }
+
     func setLaunchAtLogin(_ isOn: Bool) {
         launchAtLoginStatusText = nil
         var operationError: String?
@@ -221,6 +257,154 @@ final class MenuBarViewModel: ObservableObject {
         if status.isRunning {
             currentDate = Date()
         }
+    }
+
+    private func refreshAutoStopState() {
+        autoStopIsOn = defaults.bool(forKey: AppStorageKeys.autoStopEnabled)
+        autoStopTime = dateForToday(secondsSinceMidnight: storedAutoStopSecondsSinceMidnight())
+
+        guard autoStopIsOn else {
+            return
+        }
+
+        if let targetDate = storedAutoStopTargetDate() {
+            scheduleAutoStop(for: targetDate)
+            updateAutoStopStatus(for: targetDate)
+        } else {
+            let targetDate = targetDateForToday()
+
+            if targetDate > Date() {
+                saveAutoStopTarget(targetDate)
+                scheduleAutoStop(for: targetDate)
+                updateAutoStopStatus(for: targetDate)
+            } else {
+                autoStopStatusText = "Choose a future time for today."
+                autoStopStatusIsError = true
+            }
+        }
+    }
+
+    private func updateAutoStopSchedule() {
+        let targetDate = targetDateForToday()
+
+        guard targetDate > Date() else {
+            cancelAutoStopSchedule()
+            defaults.removeObject(forKey: AppStorageKeys.autoStopTargetTimestamp)
+            autoStopStatusText = "Choose a future time for today."
+            autoStopStatusIsError = true
+            return
+        }
+
+        saveAutoStopTarget(targetDate)
+        scheduleAutoStop(for: targetDate)
+        updateAutoStopStatus(for: targetDate)
+    }
+
+    private func scheduleAutoStop(for targetDate: Date) {
+        cancelAutoStopSchedule()
+
+        autoStopTask = Task { [weak self] in
+            let delay = max(0, targetDate.timeIntervalSinceNow)
+            let nanoseconds = UInt64(delay * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            await self?.runAutoStop(targetDate: targetDate)
+        }
+    }
+
+    private func runAutoStop(targetDate: Date) async {
+        guard autoStopIsOn else {
+            return
+        }
+
+        isWorking = true
+        inlineMessage = nil
+
+        let currentStatus = await service.fetchStatus()
+        guard currentStatus.isRunning else {
+            clearAutoStop()
+            apply(currentStatus)
+            isWorking = false
+            return
+        }
+
+        do {
+            try await service.stop(at: targetDate)
+            clearAutoStop()
+        } catch {
+            clearAutoStop()
+            inlineMessage = error.localizedDescription
+        }
+
+        apply(await service.fetchStatus())
+        isWorking = false
+    }
+
+    private func clearAutoStop() {
+        cancelAutoStopSchedule()
+        autoStopIsOn = false
+        autoStopStatusText = nil
+        autoStopStatusIsError = false
+        defaults.set(false, forKey: AppStorageKeys.autoStopEnabled)
+        defaults.removeObject(forKey: AppStorageKeys.autoStopTargetTimestamp)
+    }
+
+    private func cancelAutoStopSchedule() {
+        autoStopTask?.cancel()
+        autoStopTask = nil
+    }
+
+    private func saveAutoStopTarget(_ date: Date) {
+        defaults.set(date.timeIntervalSince1970, forKey: AppStorageKeys.autoStopTargetTimestamp)
+    }
+
+    private func storedAutoStopTargetDate() -> Date? {
+        guard defaults.object(forKey: AppStorageKeys.autoStopTargetTimestamp) != nil else {
+            return nil
+        }
+
+        return Date(timeIntervalSince1970: defaults.double(forKey: AppStorageKeys.autoStopTargetTimestamp))
+    }
+
+    private func storedAutoStopSecondsSinceMidnight() -> Int {
+        guard defaults.object(forKey: AppStorageKeys.autoStopSecondsSinceMidnight) != nil else {
+            return Self.defaultAutoStopSecondsSinceMidnight
+        }
+
+        return defaults.integer(forKey: AppStorageKeys.autoStopSecondsSinceMidnight)
+    }
+
+    private func secondsSinceMidnight(from date: Date, calendar: Calendar = .current) -> Int {
+        let components = calendar.dateComponents([.hour, .minute], from: date)
+        let hour = components.hour ?? 0
+        let minute = components.minute ?? 0
+
+        return (hour * 3_600) + (minute * 60)
+    }
+
+    private func dateForToday(secondsSinceMidnight: Int, calendar: Calendar = .current) -> Date {
+        let startOfDay = calendar.startOfDay(for: Date())
+        return calendar.date(byAdding: .second, value: secondsSinceMidnight, to: startOfDay) ?? startOfDay
+    }
+
+    private func targetDateForToday() -> Date {
+        dateForToday(secondsSinceMidnight: secondsSinceMidnight(from: autoStopTime))
+    }
+
+    private func updateAutoStopStatus(for targetDate: Date) {
+        autoStopStatusText = "Stops today at \(formattedAutoStopTime(targetDate))."
+        autoStopStatusIsError = false
+    }
+
+    private func formattedAutoStopTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 
     private func refresh(silent: Bool) async {
