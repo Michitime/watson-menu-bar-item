@@ -69,7 +69,7 @@ final class MenuBarViewModel: ObservableObject {
     func menuBarTitle(showProject: Bool, showTimer: Bool) -> String? {
         switch status.state {
         case .running:
-            let elapsedText = runningElapsedSeconds.map(formattedCounter) ?? shortElapsed(from: status.elapsed) ?? "On"
+            let elapsedText = runningElapsedSeconds.map(formattedCounter) ?? "00:00"
             var components: [String] = []
 
             if showProject {
@@ -447,8 +447,8 @@ final class MenuBarViewModel: ObservableObject {
         status = updatedStatus
         currentDate = updatedDate
 
-        if updatedStatus.isRunning, let elapsedSeconds = elapsedSeconds(from: updatedStatus.elapsed) {
-            elapsedBaselineSeconds = elapsedSeconds
+        if updatedStatus.isRunning {
+            elapsedBaselineSeconds = elapsedSeconds(from: updatedStatus.elapsed) ?? 0
             elapsedBaselineDate = updatedDate
         } else {
             elapsedBaselineSeconds = nil
@@ -479,43 +479,6 @@ final class MenuBarViewModel: ObservableObject {
             launchAtLoginNeedsApproval = false
             launchAtLoginStatusText = "Unable to read launch at login status."
         }
-    }
-
-    private func shortElapsed(from text: String?) -> String? {
-        guard let text else {
-            return nil
-        }
-
-        let lowercased = text.lowercased()
-
-        if lowercased.contains("second") {
-            return "Now"
-        }
-
-        if lowercased.contains("an hour") || lowercased.contains("a hour") {
-            return "1h"
-        }
-
-        if lowercased.contains("a minute") {
-            return "1m"
-        }
-
-        let units: [(String, String)] = [
-            ("minute", "m"),
-            ("hour", "h"),
-            ("day", "d"),
-            ("week", "w"),
-            ("month", "mo"),
-            ("year", "y")
-        ]
-
-        for (unit, suffix) in units {
-            if let value = leadingNumber(in: lowercased, before: unit) {
-                return "\(value)\(suffix)"
-            }
-        }
-
-        return nil
     }
 
     private func elapsedSeconds(from text: String?) -> TimeInterval? {
@@ -631,20 +594,4 @@ final class MenuBarViewModel: ObservableObject {
         return "\(project.prefix(maxLength))..."
     }
 
-    private func leadingNumber(in text: String, before unit: String) -> String? {
-        let pattern = #"(\d+)\s+\#(unit)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return nil
-        }
-
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        guard
-            let match = regex.firstMatch(in: text, range: range),
-            let valueRange = Range(match.range(at: 1), in: text)
-        else {
-            return nil
-        }
-
-        return String(text[valueRange])
-    }
 }
