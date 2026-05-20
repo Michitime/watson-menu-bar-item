@@ -17,7 +17,6 @@ struct WatsonService {
 
     private let idleMessage = "No project started."
     private let fileManager = FileManager.default
-    private let dailyReportParser = WatsonDailyReportParser()
 
     func fetchStatus() async -> WatsonStatus {
         guard let executable = resolveExecutablePath() else {
@@ -38,9 +37,8 @@ struct WatsonService {
             let projectResult = try await run(executable: executable, arguments: ["status", "--project"])
             let tagsResult = try await run(executable: executable, arguments: ["status", "--tags"])
             let elapsedResult = try await run(executable: executable, arguments: ["status", "--elapsed"])
-            let logResult = try await run(executable: executable, arguments: ["log", "--day", "--current", "--no-pager"])
 
-            if let failedResult = [projectResult, tagsResult, elapsedResult, logResult].first(where: { $0.exitCode != 0 }) {
+            if let failedResult = [projectResult, tagsResult, elapsedResult].first(where: { $0.exitCode != 0 }) {
                 return .error(
                     commandFailureMessage(from: failedResult, fallback: "Unable to read Watson status."),
                     executablePath: executable
@@ -50,8 +48,7 @@ struct WatsonService {
             let projectText = cleaned(projectResult.combinedOutput)
             let tagsText = cleaned(tagsResult.combinedOutput)
             let elapsedText = cleaned(elapsedResult.combinedOutput)
-            let logText = cleaned(logResult.combinedOutput)
-            let todayReport = parsedReport(from: logText)
+            let todayReport = try await fetchDailyReport(executable: executable, date: Date())
             let workWeekReport = try await fetchWorkWeekReport(executable: executable)
 
             if projectText == idleMessage || elapsedText == idleMessage {
@@ -115,6 +112,17 @@ struct WatsonService {
         }
     }
 
+    func stop(at date: Date) async throws {
+        let executable = try executablePath()
+        let result = try await run(executable: executable, arguments: ["stop", "--at", watsonDateTimeString(from: date)])
+
+        guard result.exitCode == 0 else {
+            throw ServiceError.commandFailed(
+                commandFailureMessage(from: result, fallback: "Unable to stop Watson.")
+            )
+        }
+    }
+
     private func executablePath() throws -> String {
         guard let path = resolveExecutablePath() else {
             throw ServiceError.executableNotFound
@@ -150,14 +158,23 @@ struct WatsonService {
 
     private func tokenizeTags(_ text: String) -> [String] {
         var seen = Set<String>()
-        let normalized = text.replacingOccurrences(of: ",", with: " ")
 
-        return normalized
-            .split(whereSeparator: \.isWhitespace)
-            .map(String.init)
-            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "+")) }
+        return text
+            .split { $0 == "," || $0 == ";" }
+            .map(normalizedTag)
             .filter { !$0.isEmpty }
             .filter { seen.insert($0).inserted }
+    }
+
+    private func normalizedTag(_ text: Substring) -> String {
+        let plusCharacters = CharacterSet(charactersIn: "+")
+        return text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+            .map { $0.trimmingCharacters(in: plusCharacters) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
     }
 
     private func parseTags(from text: String) -> [String] {
@@ -199,26 +216,23 @@ struct WatsonService {
     }
 
     private func fetchWorkWeekReport(executable: String) async throws -> WatsonWorkWeekReport {
-        var dayReports: [WatsonWorkWeekDayReport] = []
+        let dates = currentWorkWeekDates()
 
-        for date in currentWorkWeekDates() {
-            let dateArgument = watsonDateString(from: date)
-            let result = try await run(
-                executable: executable,
-                arguments: ["log", "--from", dateArgument, "--to", dateArgument, "--current", "--no-pager"]
-            )
+        guard let firstDate = dates.first, let lastDate = dates.last else {
+            return .empty
+        }
 
-            guard result.exitCode == 0 else {
-                throw ServiceError.commandFailed(
-                    commandFailureMessage(from: result, fallback: "Unable to read Watson work week.")
-                )
-            }
+        let reportsByStartDate = try await fetchReportsByStartDate(
+            executable: executable,
+            from: firstDate,
+            to: lastDate,
+            failureFallback: "Unable to read Watson work week."
+        )
 
-            dayReports.append(
-                WatsonWorkWeekDayReport(
-                    date: date,
-                    report: parsedReport(from: cleaned(result.combinedOutput))
-                )
+        let dayReports = dates.map { date in
+            WatsonWorkWeekDayReport(
+                date: date,
+                report: reportsByStartDate[Calendar.current.startOfDay(for: date)] ?? WatsonDailyReport(entries: [])
             )
         }
 
@@ -257,16 +271,111 @@ struct WatsonService {
         return String(format: "%04d-%02d-%02d", year, month, day)
     }
 
-    private func parsedReport(from text: String) -> WatsonDailyReport {
+    private func watsonDateTimeString(from date: Date, calendar: Calendar = .current) -> String {
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+
+        guard
+            let year = components.year,
+            let month = components.month,
+            let day = components.day,
+            let hour = components.hour,
+            let minute = components.minute,
+            let second = components.second
+        else {
+            return ""
+        }
+
+        return String(format: "%04d-%02d-%02dT%02d:%02d:%02d", year, month, day, hour, minute, second)
+    }
+
+    private func fetchDailyReport(executable: String, date: Date) async throws -> WatsonDailyReport {
+        let reportsByStartDate = try await fetchReportsByStartDate(
+            executable: executable,
+            from: date,
+            to: date,
+            failureFallback: "Unable to read Watson daily log."
+        )
+
+        return reportsByStartDate[Calendar.current.startOfDay(for: date)] ?? WatsonDailyReport(entries: [])
+    }
+
+    private func fetchReportsByStartDate(
+        executable: String,
+        from startDate: Date,
+        to endDate: Date,
+        failureFallback: String
+    ) async throws -> [Date: WatsonDailyReport] {
+        let result = try await run(
+            executable: executable,
+            arguments: [
+                "log",
+                "--from",
+                watsonDateString(from: startDate),
+                "--to",
+                watsonDateString(from: endDate),
+                "--current",
+                "--json"
+            ]
+        )
+
+        guard result.exitCode == 0 else {
+            throw ServiceError.commandFailed(
+                commandFailureMessage(from: result, fallback: failureFallback)
+            )
+        }
+
+        let frames = try decodeLogFrames(from: cleaned(result.combinedOutput))
+        let calendar = Calendar.current
+        let groupedFrames = Dictionary(grouping: frames) { frame in
+            calendar.startOfDay(for: frame.start)
+        }
+
+        return groupedFrames.mapValues { frames in
+            WatsonDailyReport(
+                entries: frames
+                    .sorted { $0.start < $1.start }
+                    .map(WatsonDailyEntry.init)
+            )
+        }
+    }
+
+    private func decodeLogFrames(from text: String) throws -> [WatsonLogFrame] {
         guard !text.isEmpty else {
-            return WatsonDailyReport(entries: [])
+            return []
         }
 
-        if text.localizedCaseInsensitiveContains("No logged time") {
-            return WatsonDailyReport(entries: [])
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateText = try container.decode(String.self)
+
+            if let date = Self.iso8601Date(from: dateText, includingFractionalSeconds: true) {
+                return date
+            }
+
+            if let date = Self.iso8601Date(from: dateText, includingFractionalSeconds: false) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid Watson log date: \(dateText)"
+            )
         }
 
-        return dailyReportParser.parse(text)
+        do {
+            return try decoder.decode([WatsonLogFrame].self, from: Data(text.utf8))
+        } catch {
+            throw ServiceError.commandFailed("Unable to parse Watson log output.")
+        }
+    }
+
+    private static func iso8601Date(from text: String, includingFractionalSeconds: Bool) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = includingFractionalSeconds
+            ? [.withInternetDateTime, .withFractionalSeconds]
+            : [.withInternetDateTime]
+        return formatter.date(from: text)
     }
 
     private func run(executable: String, arguments: [String]) async throws -> CommandResult {
@@ -309,5 +418,25 @@ private struct CommandResult {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
+    }
+}
+
+private struct WatsonLogFrame: Decodable {
+    let start: Date
+    let stop: Date
+    let project: String
+    let tags: [String]
+}
+
+private extension WatsonDailyEntry {
+    init(_ frame: WatsonLogFrame) {
+        let duration = max(0, Int(frame.stop.timeIntervalSince(frame.start).rounded(.down)))
+        let tags = frame.tags.isEmpty ? nil : "[\(frame.tags.joined(separator: ", "))]"
+
+        self.init(
+            durationInSeconds: duration,
+            projectName: frame.project,
+            tags: tags
+        )
     }
 }

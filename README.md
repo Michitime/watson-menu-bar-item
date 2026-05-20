@@ -13,6 +13,10 @@ refresh.
 - Detects `watson` in PATH, `/opt/homebrew/bin/watson`, and `/usr/local/bin/watson`
 - Supports `watson status`, `watson start <project> [tags...]`, `watson stop`, current-day log summary, and current work-week summaries
 - Shows running or idle state, current project, tags, and elapsed text
+- Shows the active project and a live elapsed counter in the menu bar by default
+- Offers a dropdown switch to hide or show the menu bar timer
+- Offers a dropdown switch to hide or show the active project in the menu bar
+- Offers an `Auto Stop` setting to stop the active Watson frame at a chosen time today
 - Shows a compact `Today` list from the current day's Watson log
 - Shows a collapsible `Work Week` list from Monday through today, capped at Friday
 - Persists the last project and tags with `AppStorage`

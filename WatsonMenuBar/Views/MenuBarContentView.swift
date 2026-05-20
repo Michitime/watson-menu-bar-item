@@ -5,6 +5,8 @@ struct MenuBarContentView: View {
     @AppStorage("lastProject") private var project = ""
     @AppStorage("lastTags") private var tags = ""
     @AppStorage("workWeekExpanded") private var workWeekExpanded = true
+    @AppStorage(AppStorageKeys.showTrackingInMenuBar) private var showTimerInMenuBar = true
+    @AppStorage(AppStorageKeys.showProjectInMenuBar) private var showProjectInMenuBar = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -114,13 +116,45 @@ struct MenuBarContentView: View {
                 TextField("feature, review, cli", text: $tags)
                     .textFieldStyle(.roundedBorder)
                     .disabled(!viewModel.canEditInputs)
+                    .onChange(of: tags) { newValue in
+                        let normalized = normalizedTagsInput(newValue)
+                        if normalized != newValue {
+                            tags = normalized
+                        }
+                    }
                     .onSubmit(startTracking)
             }
 
-            Text("Separate tags with spaces or commas.")
+            Text("Separate tags with commas or semicolons.\nSpaces become hyphens.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private func normalizedTagsInput(_ text: String) -> String {
+        var normalized = ""
+
+        for character in text {
+            if character == "," || character == ";" {
+                while normalized.last == "-" {
+                    normalized.removeLast()
+                }
+                normalized.append(character)
+                continue
+            }
+
+            if character.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) {
+                if let last = normalized.last, last != "-" && last != "," && last != ";" {
+                    normalized.append("-")
+                }
+                continue
+            }
+
+            normalized.append(character)
+        }
+
+        return normalized
     }
 
     private var actionRow: some View {
@@ -244,6 +278,60 @@ struct MenuBarContentView: View {
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
+                Text("Show Timer in Menu Bar")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Toggle("Show Timer in Menu Bar", isOn: $showTimerInMenuBar)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 12) {
+                Text("Show Project in Menu Bar")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Toggle("Show Project in Menu Bar", isOn: $showProjectInMenuBar)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 12) {
+                Text("Auto Stop")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Toggle("Auto Stop", isOn: autoStopBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            .frame(maxWidth: .infinity)
+
+            if viewModel.autoStopIsOn {
+                HStack(spacing: 12) {
+                    Text("Stop Time")
+                        .font(.system(size: 12, weight: .medium))
+
+                    Spacer()
+
+                    DatePicker("Stop Time", selection: autoStopTimeBinding, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .datePickerStyle(.field)
+                        .controlSize(.regular)
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 108, alignment: .trailing)
+                }
+                .frame(maxWidth: .infinity)
+
+                if let statusText = viewModel.autoStopStatusText {
+                    Text(statusText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(viewModel.autoStopStatusIsError ? .orange : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 12) {
                 Text("Launch at Login")
                     .font(.system(size: 12, weight: .medium))
                 Spacer()
@@ -321,6 +409,20 @@ struct MenuBarContentView: View {
         Binding(
             get: { viewModel.launchAtLoginIsOn },
             set: { viewModel.setLaunchAtLogin($0) }
+        )
+    }
+
+    private var autoStopBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.autoStopIsOn },
+            set: { viewModel.setAutoStop($0) }
+        )
+    }
+
+    private var autoStopTimeBinding: Binding<Date> {
+        Binding(
+            get: { viewModel.autoStopTime },
+            set: { viewModel.setAutoStopTime($0) }
         )
     }
 
