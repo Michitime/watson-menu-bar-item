@@ -10,16 +10,18 @@ struct WatsonMenuBarApp: App {
         MenuBarExtra {
             MenuBarContentView(viewModel: viewModel)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: viewModel.menuBarSymbolName)
-                    .symbolRenderingMode(.monochrome)
+            let menuBarTitle = viewModel.menuBarTitle(
+                showProject: showProjectInMenuBar,
+                showTimer: showTimerInMenuBar
+            )
 
-                if let menuBarTitle = viewModel.menuBarTitle(
-                    showProject: showProjectInMenuBar,
-                    showTimer: showTimerInMenuBar
-                ) {
+            HStack(spacing: 4) {
+                if let menuBarTitle {
                     Text(menuBarTitle)
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
+                } else {
+                    Image(systemName: viewModel.menuBarSymbolName)
+                        .symbolRenderingMode(.monochrome)
                 }
             }
             .help(viewModel.menuBarHelpText)
