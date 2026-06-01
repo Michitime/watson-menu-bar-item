@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: MenuBarViewModel
+    @ObservedObject var updateService: AppUpdateService
     @AppStorage("lastProject") private var project = ""
     @AppStorage("lastTags") private var tags = ""
     @AppStorage("workWeekExpanded") private var workWeekExpanded = true
@@ -21,17 +22,14 @@ struct MenuBarContentView: View {
 
             settingsSection
 
+            if updateService.showsUpdateNotice {
+                Divider()
+                updateNoticeSection
+            }
+
             Divider()
 
-            Button {
-                NSApplication.shared.terminate(nil)
-            } label: {
-                Label("Quit WatsonMenuBar", systemImage: "power")
-                    .font(.system(size: 12, weight: .medium))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
+            appActionSection
 
             if let footerText = viewModel.footerText {
                 Text(footerText)
@@ -94,6 +92,43 @@ struct MenuBarContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private var updateNoticeSection: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: updateService.state.primaryActionSymbolName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(updateNoticeColor)
+                .frame(width: 20, height: 20)
+
+            VStack(alignment: .leading, spacing: 4) {
+                if let title = updateService.state.noticeTitle {
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
+                }
+
+                if let detail = updateService.state.noticeDetail {
+                    Text(detail)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            if let actionTitle = updateService.state.primaryActionTitle, !updateService.state.replacesQuitAction {
+                Button(actionTitle) {
+                    updateService.performPrimaryAction()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!updateService.canPerformPrimaryAction)
+            }
+        }
+        .padding(10)
+        .background(updateNoticeColor.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var inputSection: some View {
@@ -367,6 +402,62 @@ struct MenuBarContentView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var appActionSection: some View {
+        VStack(spacing: 8) {
+            if updateService.showsManualCheckAction {
+                Button("Check for Updates...") {
+                    updateService.checkForUpdates()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+                .disabled(!updateService.canCheckForUpdates)
+            }
+
+            if let actionTitle = updateService.state.primaryActionTitle, updateService.state.replacesQuitAction {
+                Button {
+                    updateService.performPrimaryAction()
+                } label: {
+                    Label(actionTitle, systemImage: updateService.state.primaryActionSymbolName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .tint(updateNoticeColor)
+                .disabled(!updateService.canPerformPrimaryAction)
+
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    Label("Quit Without Updating", systemImage: "power")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    Label("Quit WatsonMenuBar", systemImage: "power")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+            }
+        }
+    }
+
+    private var updateNoticeColor: Color {
+        switch updateService.state {
+        case .error:
+            return .red
+        case .notConfigured, .idle, .checking, .available, .downloading, .downloaded, .readyToRestart, .installing:
+            return .orange
         }
     }
 
