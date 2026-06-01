@@ -9,6 +9,11 @@
 /* Begin PBXBuildFile section */
 		46754F5D2F8CF799003D5AEE /* WatsonDailyReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46754F5C2F8CF798003D5AEE /* WatsonDailyReport.swift */; };
 		46754F5F2F8CF799003D5AEE /* WatsonDailyReportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46754F5E2F8CF799003D5AEE /* WatsonDailyReportParser.swift */; };
+		46754F612F8D0001003D5AEE /* AutocompleteTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46754F602F8D0001003D5AEE /* AutocompleteTextField.swift */; };
+		4F112D1E2C41000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4F112D1D2C41000100000001 /* Assets.xcassets */; };
+		4F112D252F900001003D5AEE /* AppUpdateState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D242F900001003D5AEE /* AppUpdateState.swift */; };
+		4F112D272F900001003D5AEE /* AppUpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D262F900001003D5AEE /* AppUpdateService.swift */; };
+		4F112D282F900001003D5AEE /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 4F112D232F900001003D5AEE /* Sparkle */; };
 		4F112D112C41000100000001 /* WatsonMenuBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D012C41000100000001 /* WatsonMenuBarApp.swift */; };
 		4F112D122C41000100000001 /* WatsonStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D022C41000100000001 /* WatsonStatus.swift */; };
 		4F112D132C41000100000001 /* WatsonService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D032C41000100000001 /* WatsonService.swift */; };
@@ -19,6 +24,10 @@
 /* Begin PBXFileReference section */
 		46754F5C2F8CF798003D5AEE /* WatsonDailyReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonDailyReport.swift; sourceTree = "<group>"; };
 		46754F5E2F8CF799003D5AEE /* WatsonDailyReportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonDailyReportParser.swift; sourceTree = "<group>"; };
+		46754F602F8D0001003D5AEE /* AutocompleteTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompleteTextField.swift; sourceTree = "<group>"; };
+		4F112D1D2C41000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4F112D242F900001003D5AEE /* AppUpdateState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateState.swift; sourceTree = "<group>"; };
+		4F112D262F900001003D5AEE /* AppUpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateService.swift; sourceTree = "<group>"; };
 		4F112D002C41000100000001 /* WatsonMenuBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatsonMenuBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F112D012C41000100000001 /* WatsonMenuBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonMenuBarApp.swift; sourceTree = "<group>"; };
 		4F112D022C41000100000001 /* WatsonStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonStatus.swift; sourceTree = "<group>"; };
@@ -32,6 +41,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4F112D282F900001003D5AEE /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -50,6 +60,7 @@
 			isa = PBXGroup;
 			children = (
 				4F112D012C41000100000001 /* WatsonMenuBarApp.swift */,
+				4F112D1D2C41000100000001 /* Assets.xcassets */,
 				4F112D092C41000100000001 /* Models */,
 				4F112D0A2C41000100000001 /* Services */,
 				4F112D0B2C41000100000001 /* ViewModels */,
@@ -71,6 +82,7 @@
 			children = (
 				4F112D022C41000100000001 /* WatsonStatus.swift */,
 				46754F5C2F8CF798003D5AEE /* WatsonDailyReport.swift */,
+				4F112D242F900001003D5AEE /* AppUpdateState.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -80,6 +92,7 @@
 			children = (
 				4F112D032C41000100000001 /* WatsonService.swift */,
 				46754F5E2F8CF799003D5AEE /* WatsonDailyReportParser.swift */,
+				4F112D262F900001003D5AEE /* AppUpdateService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -95,6 +108,7 @@
 		4F112D0D2C41000100000001 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				46754F602F8D0001003D5AEE /* AutocompleteTextField.swift */,
 				4F112D052C41000100000001 /* MenuBarContentView.swift */,
 			);
 			path = Views;
@@ -116,6 +130,9 @@
 			dependencies = (
 			);
 			name = WatsonMenuBar;
+			packageProductDependencies = (
+				4F112D232F900001003D5AEE /* Sparkle */,
+			);
 			productName = WatsonMenuBar;
 			productReference = 4F112D002C41000100000001 /* WatsonMenuBar.app */;
 			productType = "com.apple.product-type.application";
@@ -144,6 +161,9 @@
 				Base,
 			);
 			mainGroup = 4F112D062C41000100000001;
+			packageReferences = (
+				4F112D222F900001003D5AEE /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			productRefGroup = 4F112D082C41000100000001 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -158,6 +178,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4F112D1E2C41000100000001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -171,10 +192,13 @@
 				4F112D112C41000100000001 /* WatsonMenuBarApp.swift in Sources */,
 				46754F5D2F8CF799003D5AEE /* WatsonDailyReport.swift in Sources */,
 				4F112D122C41000100000001 /* WatsonStatus.swift in Sources */,
+				4F112D252F900001003D5AEE /* AppUpdateState.swift in Sources */,
 				4F112D132C41000100000001 /* WatsonService.swift in Sources */,
 				4F112D142C41000100000001 /* MenuBarViewModel.swift in Sources */,
 				4F112D152C41000100000001 /* MenuBarContentView.swift in Sources */,
 				46754F5F2F8CF799003D5AEE /* WatsonDailyReportParser.swift in Sources */,
+				4F112D272F900001003D5AEE /* AppUpdateService.swift in Sources */,
+				46754F612F8D0001003D5AEE /* AutocompleteTextField.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -211,25 +235,34 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 3X429L2F57;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_SUAllowsAutomaticUpdates = YES;
+				INFOPLIST_KEY_SUAutomaticallyUpdate = YES;
+				INFOPLIST_KEY_SUEnableAutomaticChecks = YES;
+				INFOPLIST_KEY_SUFeedURL = "$(WATSON_UPDATES_FEED_URL)";
+				INFOPLIST_KEY_SUPublicEDKey = "$(WATSON_UPDATES_PUBLIC_ED_KEY)";
+				INFOPLIST_KEY_SUScheduledCheckInterval = 86400;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.michitime.WatsonMenuBar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+				WATSON_UPDATES_FEED_URL = "";
+				WATSON_UPDATES_PUBLIC_ED_KEY = "";
 			};
 			name = Debug;
 		};
@@ -237,25 +270,34 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 3X429L2F57;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_SUAllowsAutomaticUpdates = YES;
+				INFOPLIST_KEY_SUAutomaticallyUpdate = YES;
+				INFOPLIST_KEY_SUEnableAutomaticChecks = YES;
+				INFOPLIST_KEY_SUFeedURL = "$(WATSON_UPDATES_FEED_URL)";
+				INFOPLIST_KEY_SUPublicEDKey = "$(WATSON_UPDATES_PUBLIC_ED_KEY)";
+				INFOPLIST_KEY_SUScheduledCheckInterval = 86400;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.michitime.WatsonMenuBar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_VERSION = 5.0;
+				WATSON_UPDATES_FEED_URL = "";
+				WATSON_UPDATES_PUBLIC_ED_KEY = "";
 			};
 			name = Release;
 		};
@@ -281,6 +323,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4F112D222F900001003D5AEE /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4F112D232F900001003D5AEE /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4F112D222F900001003D5AEE /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4F112D162C41000100000001 /* Project object */;
 }

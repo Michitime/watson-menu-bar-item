@@ -91,7 +91,18 @@ struct WatsonService {
         }
 
         let executable = try executablePath()
-        let tagArguments = tokenizeTags(tagsInput).map { "+\($0)" }
+        let tagArguments = normalizedTags(from: tagsInput).map { "+\($0)" }
+
+        if try await isProjectStarted(executable: executable) {
+            let stopResult = try await run(executable: executable, arguments: ["stop"])
+
+            guard stopResult.exitCode == 0 else {
+                throw ServiceError.commandFailed(
+                    commandFailureMessage(from: stopResult, fallback: "Unable to stop the current Watson project.")
+                )
+            }
+        }
+
         let result = try await run(executable: executable, arguments: ["start", normalizedProject] + tagArguments)
 
         guard result.exitCode == 0 else {
@@ -121,6 +132,16 @@ struct WatsonService {
                 commandFailureMessage(from: result, fallback: "Unable to stop Watson.")
             )
         }
+    }
+
+    func normalizedTags(from text: String) -> [String] {
+        var seen = Set<String>()
+
+        return text
+            .split { $0 == "," || $0 == ";" }
+            .map(normalizedTag)
+            .filter { !$0.isEmpty }
+            .filter { seen.insert($0).inserted }
     }
 
     private func executablePath() throws -> String {
@@ -156,16 +177,6 @@ struct WatsonService {
         return nil
     }
 
-    private func tokenizeTags(_ text: String) -> [String] {
-        var seen = Set<String>()
-
-        return text
-            .split { $0 == "," || $0 == ";" }
-            .map(normalizedTag)
-            .filter { !$0.isEmpty }
-            .filter { seen.insert($0).inserted }
-    }
-
     private func normalizedTag(_ text: Substring) -> String {
         let plusCharacters = CharacterSet(charactersIn: "+")
         return text
@@ -191,6 +202,19 @@ struct WatsonService {
         return inner
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    }
+
+    private func isProjectStarted(executable: String) async throws -> Bool {
+        let result = try await run(executable: executable, arguments: ["status", "--project"])
+
+        guard result.exitCode == 0 else {
+            throw ServiceError.commandFailed(
+                commandFailureMessage(from: result, fallback: "Unable to read Watson status.")
+            )
+        }
+
+        let projectText = cleaned(result.combinedOutput)
+        return !projectText.isEmpty && projectText != idleMessage
     }
 
     private func commandFailureMessage(from result: CommandResult, fallback: String) -> String {

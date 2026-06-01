@@ -25,12 +25,12 @@ final class MenuBarViewModel: ObservableObject {
 
     private let service: WatsonService
     private let defaults: UserDefaults
-    private var refreshTask: Task<Void, Never>?
+    private var launchRefreshTask: Task<Void, Never>?
     private var counterTask: Task<Void, Never>?
     private var autoStopTask: Task<Void, Never>?
     private var elapsedBaselineSeconds: TimeInterval?
     private var elapsedBaselineDate: Date?
-    private static let refreshIntervalNanoseconds: UInt64 = 60_000_000_000
+    private var activeSessionDailyBaseline: ActiveSessionDailyBaseline?
     private static let counterIntervalNanoseconds: UInt64 = 1_000_000_000
     private static let defaultAutoStopSecondsSinceMidnight = 17 * 3_600
 
@@ -39,12 +39,12 @@ final class MenuBarViewModel: ObservableObject {
         self.defaults = defaults
         refreshAutoStopState()
         refreshLaunchAtLoginStatus()
-        startRefreshing()
+        refreshOnLaunch()
         startCounter()
     }
 
     deinit {
-        refreshTask?.cancel()
+        launchRefreshTask?.cancel()
         counterTask?.cancel()
         autoStopTask?.cancel()
     }
@@ -64,6 +64,10 @@ final class MenuBarViewModel: ObservableObject {
 
     var menuBarTitle: String {
         menuBarTitle(showProject: true, showTimer: true) ?? ""
+    }
+
+    var runningElapsedText: String? {
+        runningElapsedSeconds.map(formattedCounter)
     }
 
     func menuBarTitle(showProject: Bool, showTimer: Bool) -> String? {
@@ -154,11 +158,46 @@ final class MenuBarViewModel: ObservableObject {
         !isWorking
     }
 
+    var projectAutocompleteCandidates: [String] {
+        let reportProjects = autocompleteReports.flatMap { report in
+            report.summaries.map(\.projectName) + report.entries.map(\.projectName)
+        }
+
+        return uniqueAutocompleteCandidates([status.project].compactMap { $0 } + reportProjects)
+    }
+
+    var tagAutocompleteCandidates: [String] {
+        let reportTags = autocompleteReports.flatMap { report in
+            report.summaries.flatMap { tagCandidates(from: $0.tags) } +
+                report.entries.flatMap { tagCandidates(from: $0.tags) }
+        }
+
+        return uniqueAutocompleteCandidates(status.tags + reportTags)
+    }
+
     func refresh() async {
-        await refresh(silent: false)
+        guard !isWorking else {
+            return
+        }
+
+        isWorking = true
+        defer {
+            isWorking = false
+        }
+
+        let updatedStatus = await service.fetchStatus()
+        apply(updatedStatus)
+
+        if updatedStatus.state != .error && updatedStatus.state != .unavailable {
+            inlineMessage = nil
+        }
     }
 
     func start(project: String, tagsInput: String) async {
+        guard !isWorking else {
+            return
+        }
+
         let trimmedProject = project.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmedProject.isEmpty else {
@@ -166,9 +205,106 @@ final class MenuBarViewModel: ObservableObject {
             return
         }
 
-        await perform {
-            try await self.service.start(project: trimmedProject, tagsInput: tagsInput)
+        let normalizedTags = service.normalizedTags(from: tagsInput)
+        let existingTotal = dailyTotalSeconds(
+            project: trimmedProject,
+            tags: normalizedTags,
+            in: status.todayReport
+        )
+
+        activeSessionDailyBaseline = ActiveSessionDailyBaseline(
+            project: trimmedProject,
+            tags: normalizedTags,
+            previousTotalInSeconds: existingTotal
+        )
+
+        isWorking = true
+        inlineMessage = nil
+        defer {
+            isWorking = false
         }
+
+        do {
+            try await service.start(project: trimmedProject, tagsInput: tagsInput)
+        } catch {
+            activeSessionDailyBaseline = nil
+            inlineMessage = error.localizedDescription
+        }
+
+        apply(await service.fetchStatus())
+    }
+
+    private struct ActiveSessionDailyBaseline {
+        let project: String
+        let tags: [String]
+        let previousTotalInSeconds: Int
+    }
+
+    private func dailyTotalSeconds(project: String, tags: [String], in report: WatsonDailyReport) -> Int {
+        report.summaries
+            .filter { summary in
+                summary.projectName == project && tagIdentity(summary.tags) == tagIdentity(tags)
+            }
+            .reduce(0) { $0 + $1.totalDurationInSeconds }
+    }
+
+    private func tagIdentity(_ tagsText: String?) -> [String] {
+        guard var tagsText = tagsText?.trimmingCharacters(in: .whitespacesAndNewlines), !tagsText.isEmpty else {
+            return []
+        }
+
+        if tagsText.hasPrefix("[") && tagsText.hasSuffix("]") {
+            tagsText = String(tagsText.dropFirst().dropLast())
+        }
+
+        return tagIdentity(
+            tagsText
+                .split { $0 == "," || $0 == ";" }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        )
+    }
+
+    private func tagIdentity(_ tags: [String]) -> [String] {
+        tags
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+            .sorted()
+    }
+
+    private func dailyCounterBaselineSeconds(for updatedStatus: WatsonStatus) -> TimeInterval? {
+        guard updatedStatus.isRunning, let project = updatedStatus.project else {
+            return elapsedSeconds(from: updatedStatus.elapsed)
+        }
+
+        let currentSessionSeconds = elapsedSeconds(from: updatedStatus.elapsed)
+            .map { Int($0.rounded(.down)) }
+
+        var candidates: [Int] = []
+        let reportedDailyTotal = dailyTotalSeconds(
+            project: project,
+            tags: updatedStatus.tags,
+            in: updatedStatus.todayReport
+        )
+
+        if reportedDailyTotal > 0 {
+            candidates.append(reportedDailyTotal)
+        }
+
+        if
+            let activeSessionDailyBaseline,
+            activeSessionDailyBaseline.project == project,
+            tagIdentity(activeSessionDailyBaseline.tags) == tagIdentity(updatedStatus.tags)
+        {
+            candidates.append(activeSessionDailyBaseline.previousTotalInSeconds + (currentSessionSeconds ?? 0))
+        } else {
+            activeSessionDailyBaseline = nil
+        }
+
+        if let bestCandidate = candidates.max() {
+            return TimeInterval(bestCandidate)
+        }
+
+        return currentSessionSeconds.map(TimeInterval.init)
     }
 
     func stop() async {
@@ -225,18 +361,13 @@ final class MenuBarViewModel: ObservableObject {
         SMAppService.openSystemSettingsLoginItems()
     }
 
-    private func startRefreshing() {
-        guard refreshTask == nil else {
+    private func refreshOnLaunch() {
+        guard launchRefreshTask == nil else {
             return
         }
 
-        refreshTask = Task { [weak self] in
-            await self?.refresh(silent: false)
-
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: Self.refreshIntervalNanoseconds)
-                await self?.refresh(silent: true)
-            }
+        launchRefreshTask = Task { [weak self] in
+            await self?.refresh()
         }
     }
 
@@ -257,6 +388,46 @@ final class MenuBarViewModel: ObservableObject {
         if status.isRunning {
             currentDate = Date()
         }
+    }
+
+    private var autocompleteReports: [WatsonDailyReport] {
+        [status.todayReport] + status.workWeekReport.days.map(\.report)
+    }
+
+    private func tagCandidates(from tagsText: String?) -> [String] {
+        guard var text = tagsText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return []
+        }
+
+        if text.hasPrefix("[") && text.hasSuffix("]") {
+            text = String(text.dropFirst().dropLast())
+        }
+
+        return text
+            .split { $0 == "," || $0 == ";" }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func uniqueAutocompleteCandidates(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var uniqueValues: [String] = []
+
+        for value in values {
+            let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedValue.isEmpty else {
+                continue
+            }
+
+            let key = trimmedValue.lowercased()
+            guard seen.insert(key).inserted else {
+                continue
+            }
+
+            uniqueValues.append(trimmedValue)
+        }
+
+        return uniqueValues
     }
 
     private func refreshAutoStopState() {
@@ -407,27 +578,6 @@ final class MenuBarViewModel: ObservableObject {
         return formatter.string(from: date)
     }
 
-    private func refresh(silent: Bool) async {
-        if silent && isWorking {
-            return
-        }
-
-        if !silent {
-            isWorking = true
-        }
-
-        let updatedStatus = await service.fetchStatus()
-        apply(updatedStatus)
-
-        if updatedStatus.state != .error && updatedStatus.state != .unavailable {
-            inlineMessage = nil
-        }
-
-        if !silent {
-            isWorking = false
-        }
-    }
-
     private func perform(_ operation: @escaping () async throws -> Void) async {
         isWorking = true
         inlineMessage = nil
@@ -448,9 +598,10 @@ final class MenuBarViewModel: ObservableObject {
         currentDate = updatedDate
 
         if updatedStatus.isRunning {
-            elapsedBaselineSeconds = elapsedSeconds(from: updatedStatus.elapsed) ?? 0
+            elapsedBaselineSeconds = dailyCounterBaselineSeconds(for: updatedStatus) ?? 0
             elapsedBaselineDate = updatedDate
         } else {
+            activeSessionDailyBaseline = nil
             elapsedBaselineSeconds = nil
             elapsedBaselineDate = nil
         }
