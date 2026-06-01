@@ -102,10 +102,14 @@ struct MenuBarContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                TextField("Project name", text: $project)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(!viewModel.canEditInputs)
-                    .onSubmit(startTracking)
+                AutocompleteTextField(
+                    text: $project,
+                    placeholder: "Project name",
+                    candidates: viewModel.projectAutocompleteCandidates,
+                    isEnabled: viewModel.canEditInputs,
+                    completionMode: .wholeField,
+                    onSubmit: startTracking
+                )
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -113,16 +117,20 @@ struct MenuBarContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                TextField("feature, review, cli", text: $tags)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(!viewModel.canEditInputs)
+                AutocompleteTextField(
+                    text: $tags,
+                    placeholder: "feature, review, cli",
+                    candidates: viewModel.tagAutocompleteCandidates,
+                    isEnabled: viewModel.canEditInputs,
+                    completionMode: .delimitedToken,
+                    onSubmit: startTracking
+                )
                     .onChange(of: tags) { newValue in
                         let normalized = normalizedTagsInput(newValue)
                         if normalized != newValue {
                             tags = normalized
                         }
                     }
-                    .onSubmit(startTracking)
             }
 
             Text("Separate tags with commas or semicolons.\nSpaces become hyphens.")

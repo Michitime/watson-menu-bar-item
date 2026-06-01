@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		46754F5D2F8CF799003D5AEE /* WatsonDailyReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46754F5C2F8CF798003D5AEE /* WatsonDailyReport.swift */; };
 		46754F5F2F8CF799003D5AEE /* WatsonDailyReportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46754F5E2F8CF799003D5AEE /* WatsonDailyReportParser.swift */; };
+		46754F612F8D0001003D5AEE /* AutocompleteTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46754F602F8D0001003D5AEE /* AutocompleteTextField.swift */; };
 		4F112D112C41000100000001 /* WatsonMenuBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D012C41000100000001 /* WatsonMenuBarApp.swift */; };
 		4F112D122C41000100000001 /* WatsonStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D022C41000100000001 /* WatsonStatus.swift */; };
 		4F112D132C41000100000001 /* WatsonService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F112D032C41000100000001 /* WatsonService.swift */; };
@@ -19,6 +20,7 @@
 /* Begin PBXFileReference section */
 		46754F5C2F8CF798003D5AEE /* WatsonDailyReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonDailyReport.swift; sourceTree = "<group>"; };
 		46754F5E2F8CF799003D5AEE /* WatsonDailyReportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonDailyReportParser.swift; sourceTree = "<group>"; };
+		46754F602F8D0001003D5AEE /* AutocompleteTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutocompleteTextField.swift; sourceTree = "<group>"; };
 		4F112D002C41000100000001 /* WatsonMenuBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatsonMenuBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F112D012C41000100000001 /* WatsonMenuBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonMenuBarApp.swift; sourceTree = "<group>"; };
 		4F112D022C41000100000001 /* WatsonStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatsonStatus.swift; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 		4F112D0D2C41000100000001 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				46754F602F8D0001003D5AEE /* AutocompleteTextField.swift */,
 				4F112D052C41000100000001 /* MenuBarContentView.swift */,
 			);
 			path = Views;
@@ -175,6 +178,7 @@
 				4F112D142C41000100000001 /* MenuBarViewModel.swift in Sources */,
 				4F112D152C41000100000001 /* MenuBarContentView.swift in Sources */,
 				46754F5F2F8CF799003D5AEE /* WatsonDailyReportParser.swift in Sources */,
+				46754F612F8D0001003D5AEE /* AutocompleteTextField.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
