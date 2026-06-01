@@ -91,7 +91,7 @@ struct WatsonService {
         }
 
         let executable = try executablePath()
-        let tagArguments = tokenizeTags(tagsInput).map { "+\($0)" }
+        let tagArguments = normalizedTags(from: tagsInput).map { "+\($0)" }
         let result = try await run(executable: executable, arguments: ["start", normalizedProject] + tagArguments)
 
         guard result.exitCode == 0 else {
@@ -121,6 +121,16 @@ struct WatsonService {
                 commandFailureMessage(from: result, fallback: "Unable to stop Watson.")
             )
         }
+    }
+
+    func normalizedTags(from text: String) -> [String] {
+        var seen = Set<String>()
+
+        return text
+            .split { $0 == "," || $0 == ";" }
+            .map(normalizedTag)
+            .filter { !$0.isEmpty }
+            .filter { seen.insert($0).inserted }
     }
 
     private func executablePath() throws -> String {
@@ -154,16 +164,6 @@ struct WatsonService {
         }
 
         return nil
-    }
-
-    private func tokenizeTags(_ text: String) -> [String] {
-        var seen = Set<String>()
-
-        return text
-            .split { $0 == "," || $0 == ";" }
-            .map(normalizedTag)
-            .filter { !$0.isEmpty }
-            .filter { seen.insert($0).inserted }
     }
 
     private func normalizedTag(_ text: Substring) -> String {
