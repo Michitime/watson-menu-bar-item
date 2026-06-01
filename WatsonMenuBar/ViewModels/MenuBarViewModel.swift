@@ -65,10 +65,14 @@ final class MenuBarViewModel: ObservableObject {
         menuBarTitle(showProject: true, showTimer: true) ?? ""
     }
 
+    var runningElapsedText: String? {
+        runningElapsedSeconds.map(formattedCounter)
+    }
+
     func menuBarTitle(showProject: Bool, showTimer: Bool) -> String? {
         switch status.state {
         case .running:
-            let elapsedText = runningElapsedSeconds.map(formattedCounter) ?? shortElapsed(from: status.elapsed) ?? "On"
+            let elapsedText = runningElapsedText ?? shortElapsed(from: status.elapsed) ?? "On"
             var components: [String] = []
 
             if showProject {

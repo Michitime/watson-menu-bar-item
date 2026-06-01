@@ -86,9 +86,9 @@ struct MenuBarContentView: View {
 
             Spacer(minLength: 8)
 
-            if viewModel.status.isRunning, let elapsed = viewModel.status.elapsed {
+            if let elapsed = viewModel.runningElapsedText {
                 Text(elapsed)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.trailing)
                     .fixedSize(horizontal: false, vertical: true)
