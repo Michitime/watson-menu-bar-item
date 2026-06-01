@@ -30,6 +30,7 @@ final class MenuBarViewModel: ObservableObject {
     private var autoStopTask: Task<Void, Never>?
     private var elapsedBaselineSeconds: TimeInterval?
     private var elapsedBaselineDate: Date?
+    private var activeSessionDailyBaseline: ActiveSessionDailyBaseline?
     private static let refreshIntervalNanoseconds: UInt64 = 60_000_000_000
     private static let counterIntervalNanoseconds: UInt64 = 1_000_000_000
     private static let defaultAutoStopSecondsSinceMidnight = 17 * 3_600
@@ -166,9 +167,104 @@ final class MenuBarViewModel: ObservableObject {
             return
         }
 
-        await perform {
-            try await self.service.start(project: trimmedProject, tagsInput: tagsInput)
+        let normalizedTags = service.normalizedTags(from: tagsInput)
+        let existingTotal = dailyTotalSeconds(
+            project: trimmedProject,
+            tags: normalizedTags,
+            in: status.todayReport
+        )
+
+        activeSessionDailyBaseline = ActiveSessionDailyBaseline(
+            project: trimmedProject,
+            tags: normalizedTags,
+            previousTotalInSeconds: existingTotal
+        )
+
+        isWorking = true
+        inlineMessage = nil
+
+        do {
+            try await service.start(project: trimmedProject, tagsInput: tagsInput)
+        } catch {
+            activeSessionDailyBaseline = nil
+            inlineMessage = error.localizedDescription
         }
+
+        apply(await service.fetchStatus())
+        isWorking = false
+    }
+
+    private struct ActiveSessionDailyBaseline {
+        let project: String
+        let tags: [String]
+        let previousTotalInSeconds: Int
+    }
+
+    private func dailyTotalSeconds(project: String, tags: [String], in report: WatsonDailyReport) -> Int {
+        report.summaries
+            .filter { summary in
+                summary.projectName == project && tagIdentity(summary.tags) == tagIdentity(tags)
+            }
+            .reduce(0) { $0 + $1.totalDurationInSeconds }
+    }
+
+    private func tagIdentity(_ tagsText: String?) -> [String] {
+        guard var tagsText = tagsText?.trimmingCharacters(in: .whitespacesAndNewlines), !tagsText.isEmpty else {
+            return []
+        }
+
+        if tagsText.hasPrefix("[") && tagsText.hasSuffix("]") {
+            tagsText = String(tagsText.dropFirst().dropLast())
+        }
+
+        return tagIdentity(
+            tagsText
+                .split { $0 == "," || $0 == ";" }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        )
+    }
+
+    private func tagIdentity(_ tags: [String]) -> [String] {
+        tags
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+            .sorted()
+    }
+
+    private func dailyCounterBaselineSeconds(for updatedStatus: WatsonStatus) -> TimeInterval? {
+        guard updatedStatus.isRunning, let project = updatedStatus.project else {
+            return elapsedSeconds(from: updatedStatus.elapsed)
+        }
+
+        let currentSessionSeconds = elapsedSeconds(from: updatedStatus.elapsed)
+            .map { Int($0.rounded(.down)) }
+
+        var candidates: [Int] = []
+        let reportedDailyTotal = dailyTotalSeconds(
+            project: project,
+            tags: updatedStatus.tags,
+            in: updatedStatus.todayReport
+        )
+
+        if reportedDailyTotal > 0 {
+            candidates.append(reportedDailyTotal)
+        }
+
+        if
+            let activeSessionDailyBaseline,
+            activeSessionDailyBaseline.project == project,
+            tagIdentity(activeSessionDailyBaseline.tags) == tagIdentity(updatedStatus.tags)
+        {
+            candidates.append(activeSessionDailyBaseline.previousTotalInSeconds + (currentSessionSeconds ?? 0))
+        } else {
+            activeSessionDailyBaseline = nil
+        }
+
+        if let bestCandidate = candidates.max() {
+            return TimeInterval(bestCandidate)
+        }
+
+        return currentSessionSeconds.map(TimeInterval.init)
     }
 
     func stop() async {
@@ -447,10 +543,11 @@ final class MenuBarViewModel: ObservableObject {
         status = updatedStatus
         currentDate = updatedDate
 
-        if updatedStatus.isRunning, let elapsedSeconds = elapsedSeconds(from: updatedStatus.elapsed) {
-            elapsedBaselineSeconds = elapsedSeconds
+        if updatedStatus.isRunning {
+            elapsedBaselineSeconds = dailyCounterBaselineSeconds(for: updatedStatus) ?? 0
             elapsedBaselineDate = updatedDate
         } else {
+            activeSessionDailyBaseline = nil
             elapsedBaselineSeconds = nil
             elapsedBaselineDate = nil
         }
