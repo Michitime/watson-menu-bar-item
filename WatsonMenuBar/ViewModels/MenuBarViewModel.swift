@@ -158,6 +158,23 @@ final class MenuBarViewModel: ObservableObject {
         !isWorking
     }
 
+    var projectAutocompleteCandidates: [String] {
+        let reportProjects = autocompleteReports.flatMap { report in
+            report.summaries.map(\.projectName) + report.entries.map(\.projectName)
+        }
+
+        return uniqueAutocompleteCandidates([status.project].compactMap { $0 } + reportProjects)
+    }
+
+    var tagAutocompleteCandidates: [String] {
+        let reportTags = autocompleteReports.flatMap { report in
+            report.summaries.flatMap { tagCandidates(from: $0.tags) } +
+                report.entries.flatMap { tagCandidates(from: $0.tags) }
+        }
+
+        return uniqueAutocompleteCandidates(status.tags + reportTags)
+    }
+
     func refresh() async {
         guard !isWorking else {
             return
@@ -365,6 +382,46 @@ final class MenuBarViewModel: ObservableObject {
         if status.isRunning {
             currentDate = Date()
         }
+    }
+
+    private var autocompleteReports: [WatsonDailyReport] {
+        [status.todayReport] + status.workWeekReport.days.map(\.report)
+    }
+
+    private func tagCandidates(from tagsText: String?) -> [String] {
+        guard var text = tagsText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return []
+        }
+
+        if text.hasPrefix("[") && text.hasSuffix("]") {
+            text = String(text.dropFirst().dropLast())
+        }
+
+        return text
+            .split { $0 == "," || $0 == ";" }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func uniqueAutocompleteCandidates(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var uniqueValues: [String] = []
+
+        for value in values {
+            let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedValue.isEmpty else {
+                continue
+            }
+
+            let key = trimmedValue.lowercased()
+            guard seen.insert(key).inserted else {
+                continue
+            }
+
+            uniqueValues.append(trimmedValue)
+        }
+
+        return uniqueValues
     }
 
     private func refreshAutoStopState() {
