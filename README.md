@@ -21,14 +21,15 @@ refresh.
 - Shows a collapsible `Work Week` list from Monday through today, capped at Friday
 - Persists the last project and tags with `AppStorage`
 - Offers a dropdown switch to launch the app at login
+- Supports Sparkle-powered automatic update checks when a feed URL and public key are configured
 - Refreshes on launch, after start/stop actions, on manual refresh, and every 1 minute
-- No third-party dependencies
 
 ## Build
 
 1. Install Watson separately, for example with `brew install watson`.
 2. Open `WatsonMenuBar.xcodeproj` in Xcode.
-3. Run the `WatsonMenuBar` scheme.
+3. Let Xcode resolve the Sparkle Swift package dependency.
+4. Run the `WatsonMenuBar` scheme.
 
 The app targets macOS 13.0 or later and runs as a menu bar utility via
 `LSUIElement`.
