@@ -42,6 +42,7 @@ struct MenuBarContentView: View {
         }
         .padding(14)
         .frame(width: 340)
+        .onAppear(perform: refresh)
     }
 
     private var statusHeader: some View {

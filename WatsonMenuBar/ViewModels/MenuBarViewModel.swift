@@ -25,12 +25,11 @@ final class MenuBarViewModel: ObservableObject {
 
     private let service: WatsonService
     private let defaults: UserDefaults
-    private var refreshTask: Task<Void, Never>?
+    private var launchRefreshTask: Task<Void, Never>?
     private var counterTask: Task<Void, Never>?
     private var autoStopTask: Task<Void, Never>?
     private var elapsedBaselineSeconds: TimeInterval?
     private var elapsedBaselineDate: Date?
-    private static let refreshIntervalNanoseconds: UInt64 = 60_000_000_000
     private static let counterIntervalNanoseconds: UInt64 = 1_000_000_000
     private static let defaultAutoStopSecondsSinceMidnight = 17 * 3_600
 
@@ -39,12 +38,12 @@ final class MenuBarViewModel: ObservableObject {
         self.defaults = defaults
         refreshAutoStopState()
         refreshLaunchAtLoginStatus()
-        startRefreshing()
+        refreshOnLaunch()
         startCounter()
     }
 
     deinit {
-        refreshTask?.cancel()
+        launchRefreshTask?.cancel()
         counterTask?.cancel()
         autoStopTask?.cancel()
     }
@@ -155,7 +154,21 @@ final class MenuBarViewModel: ObservableObject {
     }
 
     func refresh() async {
-        await refresh(silent: false)
+        guard !isWorking else {
+            return
+        }
+
+        isWorking = true
+        defer {
+            isWorking = false
+        }
+
+        let updatedStatus = await service.fetchStatus()
+        apply(updatedStatus)
+
+        if updatedStatus.state != .error && updatedStatus.state != .unavailable {
+            inlineMessage = nil
+        }
     }
 
     func start(project: String, tagsInput: String) async {
@@ -225,18 +238,13 @@ final class MenuBarViewModel: ObservableObject {
         SMAppService.openSystemSettingsLoginItems()
     }
 
-    private func startRefreshing() {
-        guard refreshTask == nil else {
+    private func refreshOnLaunch() {
+        guard launchRefreshTask == nil else {
             return
         }
 
-        refreshTask = Task { [weak self] in
-            await self?.refresh(silent: false)
-
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: Self.refreshIntervalNanoseconds)
-                await self?.refresh(silent: true)
-            }
+        launchRefreshTask = Task { [weak self] in
+            await self?.refresh()
         }
     }
 
@@ -405,27 +413,6 @@ final class MenuBarViewModel: ObservableObject {
         formatter.dateStyle = .none
         formatter.timeStyle = .short
         return formatter.string(from: date)
-    }
-
-    private func refresh(silent: Bool) async {
-        if silent && isWorking {
-            return
-        }
-
-        if !silent {
-            isWorking = true
-        }
-
-        let updatedStatus = await service.fetchStatus()
-        apply(updatedStatus)
-
-        if updatedStatus.state != .error && updatedStatus.state != .unavailable {
-            inlineMessage = nil
-        }
-
-        if !silent {
-            isWorking = false
-        }
     }
 
     private func perform(_ operation: @escaping () async throws -> Void) async {
