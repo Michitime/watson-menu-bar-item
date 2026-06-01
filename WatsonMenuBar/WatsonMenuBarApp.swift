@@ -14,14 +14,17 @@ struct WatsonMenuBarApp: App {
                 showProject: showProjectInMenuBar,
                 showTimer: showTimerInMenuBar
             )
+            let shouldShowIcon = viewModel.status.state == .idle || menuBarTitle == nil
 
             HStack(spacing: 4) {
+                if shouldShowIcon {
+                    Image(systemName: viewModel.menuBarSymbolName)
+                        .symbolRenderingMode(.monochrome)
+                }
+
                 if let menuBarTitle {
                     Text(menuBarTitle)
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
-                } else {
-                    Image(systemName: viewModel.menuBarSymbolName)
-                        .symbolRenderingMode(.monochrome)
                 }
             }
             .help(viewModel.menuBarHelpText)
