@@ -7,7 +7,7 @@ refresh.
 
 ## Features
 
-- Menu bar only app built with SwiftUI `MenuBarExtra`
+- Menu bar only app built with `NSStatusItem`, a transient `NSPopover`, and SwiftUI content
 - Native macOS agent app with no Dock icon
 - Uses `Process` and `Pipe` to call the Watson CLI
 - Detects `watson` in PATH, `/opt/homebrew/bin/watson`, and `/usr/local/bin/watson`
@@ -30,12 +30,12 @@ refresh.
 2. Open `WatsonMenuBar.xcodeproj` in Xcode.
 3. Run the `WatsonMenuBar` scheme.
 
-The app targets macOS 13.0 or later and runs as a menu bar utility via
+The app targets macOS 15.0 or later and runs as a menu bar utility via
 `LSUIElement`.
 
 ## File Structure
 
-- `WatsonMenuBar/WatsonMenuBarApp.swift`: App entry and `MenuBarExtra` scene
+- `WatsonMenuBar/WatsonMenuBarApp.swift`: App entry, AppKit status item, and transient SwiftUI popover
 - `WatsonMenuBar/Models/WatsonStatus.swift`: Running, idle, unavailable, and error state model
 - `WatsonMenuBar/Services/WatsonService.swift`: Watson executable discovery and CLI command execution
 - `WatsonMenuBar/ViewModels/MenuBarViewModel.swift`: Refresh loop, menu bar label state, and actions
