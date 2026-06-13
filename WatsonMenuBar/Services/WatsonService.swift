@@ -48,7 +48,10 @@ struct WatsonService {
             let projectText = cleaned(projectResult.combinedOutput)
             let tagsText = cleaned(tagsResult.combinedOutput)
             let elapsedText = cleaned(elapsedResult.combinedOutput)
-            let todayReport = try await fetchDailyReport(executable: executable, date: Date())
+            let today = Date()
+            let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today) ?? today
+            let todayReport = try await fetchDailyReport(executable: executable, date: today)
+            let yesterdayReport = try await fetchDailyReport(executable: executable, date: yesterday)
             let workWeekReport = try await fetchWorkWeekReport(executable: executable)
 
             if projectText == idleMessage || elapsedText == idleMessage {
@@ -58,6 +61,7 @@ struct WatsonService {
                     tags: [],
                     elapsed: nil,
                     todayReport: todayReport,
+                    yesterdayReport: yesterdayReport,
                     workWeekReport: workWeekReport,
                     message: nil,
                     executablePath: executable
@@ -69,6 +73,7 @@ struct WatsonService {
                 tags: parseTags(from: tagsText),
                 elapsed: elapsedText.isEmpty ? nil : elapsedText,
                 todayReport: todayReport,
+                yesterdayReport: yesterdayReport,
                 workWeekReport: workWeekReport,
                 executablePath: executable
             )
@@ -403,7 +408,7 @@ struct WatsonService {
     }
 
     private func run(executable: String, arguments: [String]) async throws -> CommandResult {
-        try await Task.detached(priority: .userInitiated) {
+        try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             let stdout = Pipe()
             let stderr = Pipe()
@@ -416,19 +421,32 @@ struct WatsonService {
             process.standardError = stderr
             process.standardInput = stdin
 
-            try process.run()
-            stdin.fileHandleForWriting.closeFile()
-            process.waitUntilExit()
+            process.terminationHandler = { completedProcess in
+                _ = process
+                defer {
+                    completedProcess.terminationHandler = nil
+                }
 
-            let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
-            let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
+                let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
+                let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
 
-            return CommandResult(
-                exitCode: process.terminationStatus,
-                stdout: String(decoding: stdoutData, as: UTF8.self),
-                stderr: String(decoding: stderrData, as: UTF8.self)
-            )
-        }.value
+                continuation.resume(
+                    returning: CommandResult(
+                        exitCode: completedProcess.terminationStatus,
+                        stdout: String(decoding: stdoutData, as: UTF8.self),
+                        stderr: String(decoding: stderrData, as: UTF8.self)
+                    )
+                )
+            }
+
+            do {
+                try process.run()
+                stdin.fileHandleForWriting.closeFile()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
+            }
+        }
     }
 }
 

@@ -2,177 +2,413 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: MenuBarViewModel
-    @ObservedObject var updateService: AppUpdateService
+    @ObservedObject var updateMonitor: HomebrewUpdateMonitor
+    @ObservedObject var navigationState: MenuBarNavigationState
     @AppStorage("lastProject") private var project = ""
     @AppStorage("lastTags") private var tags = ""
-    @AppStorage("workWeekExpanded") private var workWeekExpanded = true
     @AppStorage(AppStorageKeys.showTrackingInMenuBar) private var showTimerInMenuBar = true
     @AppStorage(AppStorageKeys.showProjectInMenuBar) private var showProjectInMenuBar = true
+    @State private var selectedRecentScope: RecentWorkScope = .today
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             statusHeader
-            Divider()
-            inputSection
-            actionRow
-            todayLogSection
-            workWeekSection
 
-            Divider()
-
-            settingsSection
-
-            if updateService.showsUpdateNotice {
-                Divider()
-                updateNoticeSection
+            if navigationState.isShowingSettings {
+                settingsPage
+            } else {
+                primaryTrackingPanel
+                recentWorkArea
             }
 
-            Divider()
-
-            appActionSection
-
             if let footerText = viewModel.footerText {
-                Text(footerText)
-                    .font(.system(size: 11))
-                    .foregroundStyle(viewModel.footerIsError ? Color.red : .secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                NoticeRow(
+                    title: viewModel.footerIsError ? "Needs attention" : "Status",
+                    detail: footerText,
+                    systemName: viewModel.footerIsError ? "exclamationmark.triangle.fill" : "info.circle.fill",
+                    tint: viewModel.footerIsError ? .red : .secondary
+                )
             }
         }
         .padding(14)
-        .frame(width: 340)
+        .frame(width: 360)
+        .background(.regularMaterial)
         .onAppear(perform: refresh)
     }
 
     private var statusHeader: some View {
-        HStack(alignment: .top, spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(accentColor.opacity(0.16))
+        HStack(alignment: .center, spacing: 10) {
+            statusIcon
 
-                Image(systemName: headerSymbolName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(accentColor)
-            }
-            .frame(width: 30, height: 30)
-
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(viewModel.status.displayTitle)
                         .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
 
                     if viewModel.isWorking {
                         ProgressView()
                             .controlSize(.small)
-                            .scaleEffect(0.75)
+                            .scaleEffect(0.7)
                     }
                 }
 
-                if let primaryLine = viewModel.status.primaryLine {
-                    Text(primaryLine)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+                Text(statusDetailText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
 
                 if let tagsLine = viewModel.status.tagsLine {
                     Text(tagsLine)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
 
             Spacer(minLength: 8)
 
-            if let elapsed = viewModel.runningElapsedText {
-                Text(elapsed)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var updateNoticeSection: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: updateService.state.primaryActionSymbolName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(updateNoticeColor)
-                .frame(width: 20, height: 20)
-
-            VStack(alignment: .leading, spacing: 4) {
-                if let title = updateService.state.noticeTitle {
-                    Text(title)
-                        .font(.system(size: 12, weight: .semibold))
-                }
-
-                if let detail = updateService.state.noticeDetail {
-                    Text(detail)
-                        .font(.system(size: 11))
+            VStack(alignment: .trailing, spacing: 6) {
+                if let elapsed = viewModel.runningElapsedText {
+                    Text(elapsed)
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
                 }
-            }
 
-            Spacer(minLength: 8)
+                HStack(spacing: 6) {
+                    NativeIconButton(
+                        systemName: "arrow.clockwise",
+                        accessibilityLabel: "Refresh",
+                        help: "Refresh Watson status",
+                        isEnabled: viewModel.canRefresh,
+                        keyEquivalent: "r",
+                        modifiers: .command,
+                        action: refresh
+                    )
 
-            if let actionTitle = updateService.state.primaryActionTitle, !updateService.state.replacesQuitAction {
-                Button(actionTitle) {
-                    updateService.performPrimaryAction()
+                    NativeIconButton(
+                        systemName: navigationState.isShowingSettings ? "gearshape.fill" : "gearshape",
+                        accessibilityLabel: "Settings",
+                        help: "Show settings",
+                        isSelected: navigationState.isShowingSettings,
+                        keyEquivalent: ",",
+                        modifiers: .command
+                    ) {
+                        navigationState.toggleSettings()
+                    }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(!updateService.canPerformPrimaryAction)
             }
         }
-        .padding(10)
-        .background(updateNoticeColor.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
-    private var inputSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Project")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    private var primaryTrackingPanel: some View {
+        NativeGroup {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeader("Track")
 
-                AutocompleteTextField(
-                    text: $project,
-                    placeholder: "Project name",
-                    candidates: viewModel.projectAutocompleteCandidates,
-                    isEnabled: viewModel.canEditInputs,
-                    completionMode: .wholeField,
-                    onSubmit: startTracking
-                )
-            }
+                FieldRow(title: "Project", systemName: "folder") {
+                    AutocompleteTextField(
+                        text: $project,
+                        placeholder: "Project name",
+                        candidates: viewModel.projectAutocompleteCandidates,
+                        isEnabled: viewModel.canEditInputs,
+                        completionMode: .wholeField,
+                        onSubmit: startTracking
+                    )
+                }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Tags")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                NativeSeparator()
 
-                AutocompleteTextField(
-                    text: $tags,
-                    placeholder: "feature, review, cli",
-                    candidates: viewModel.tagAutocompleteCandidates,
-                    isEnabled: viewModel.canEditInputs,
-                    completionMode: .delimitedToken,
-                    onSubmit: startTracking
-                )
-                    .onChange(of: tags) { newValue in
+                FieldRow(title: "Tags", systemName: "tag") {
+                    AutocompleteTextField(
+                        text: $tags,
+                        placeholder: "feature, review, cli",
+                        candidates: viewModel.tagAutocompleteCandidates,
+                        isEnabled: viewModel.canEditInputs,
+                        completionMode: .delimitedToken,
+                        onSubmit: startTracking
+                    )
+                    .onChange(of: tags) { _, newValue in
                         let normalized = normalizedTagsInput(newValue)
                         if normalized != newValue {
                             tags = normalized
                         }
                     }
-            }
+                }
 
-            Text("Separate tags with commas or semicolons.\nSpaces become hyphens.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                primaryActionButton
+            }
+        }
+    }
+
+    private var primaryActionButton: some View {
+        Button(action: primaryAction) {
+            Label(primaryActionTitle, systemImage: primaryActionSymbolName)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .keyboardShortcut(.defaultAction)
+        .tint(viewModel.status.isRunning ? .red : .accentColor)
+        .disabled(!canPerformPrimaryAction)
+        .accessibilityLabel(primaryActionTitle)
+        .help(primaryActionHelp)
+    }
+
+    private var recentWorkArea: some View {
+        NativeGroup {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
+                    SectionHeader("Recent Work")
+
+                    Spacer(minLength: 8)
+
+                    Picker("Recent Work", selection: $selectedRecentScope) {
+                        ForEach(RecentWorkScope.allCases) { scope in
+                            Text(scope.title).tag(scope)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 136)
+                    .labelsHidden()
+                }
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        switch selectedRecentScope {
+                        case .today:
+                            todayRows
+                        case .week:
+                            weekRows
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 214)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var todayRows: some View {
+        let summaries = viewModel.status.todayReport.summaries
+
+        if summaries.isEmpty {
+            EmptyStateRow(text: "No entries recorded today.")
+        } else {
+            ForEach(Array(summaries.enumerated()), id: \.element.id) { index, summary in
+                SummaryResumeRow(
+                    summary: summary,
+                    dateLabel: "Today",
+                    isEnabled: viewModel.canStart
+                ) {
+                    startTracking(summary: summary, date: Date())
+                }
+
+                if index < summaries.count - 1 {
+                    NativeSeparator()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var weekRows: some View {
+        let days = viewModel.status.workWeekReport.days
+
+        if days.isEmpty {
+            EmptyStateRow(text: "No work week data available.")
+        } else {
+            ForEach(Array(days.enumerated()), id: \.element.id) { dayIndex, day in
+                WorkWeekDayGroup(
+                    day: day,
+                    totalText: workWeekTotalText(for: day.report),
+                    canStart: viewModel.canStart,
+                    start: startTracking(summary:date:)
+                )
+
+                if dayIndex < days.count - 1 {
+                    NativeSeparator()
+                        .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    private var settingsPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if updateMonitor.state.showsUpdateNotice {
+                    updateNoticeRow
+                }
+
+                NativeGroup {
+                    VStack(alignment: .leading, spacing: 0) {
+                        SectionHeader("Menu Bar")
+                            .padding(.bottom, 6)
+
+                        SettingsRow(title: "Show Timer", systemName: "timer") {
+                            Toggle("Show Timer", isOn: $showTimerInMenuBar)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+
+                        NativeSeparator()
+
+                        SettingsRow(title: "Show Project", systemName: "text.badge.checkmark") {
+                            Toggle("Show Project", isOn: $showProjectInMenuBar)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+                    }
+                }
+
+                NativeGroup {
+                    VStack(alignment: .leading, spacing: 0) {
+                        SectionHeader("Automation")
+                            .padding(.bottom, 6)
+
+                        SettingsRow(title: "Auto Stop", systemName: "stopwatch") {
+                            Toggle("Auto Stop", isOn: autoStopBinding)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+
+                        if viewModel.autoStopIsOn {
+                            NativeSeparator()
+
+                            SettingsRow(
+                                title: "Stop Time",
+                                subtitle: viewModel.autoStopStatusText,
+                                subtitleIsWarning: viewModel.autoStopStatusIsError,
+                                systemName: "clock"
+                            ) {
+                                DatePicker(
+                                    "Stop Time",
+                                    selection: autoStopTimeBinding,
+                                    displayedComponents: .hourAndMinute
+                                )
+                                .labelsHidden()
+                                .datePickerStyle(.field)
+                                .frame(width: 106, alignment: .trailing)
+                            }
+                        }
+                    }
+                }
+
+                NativeGroup {
+                    VStack(alignment: .leading, spacing: 0) {
+                        SectionHeader("App")
+                            .padding(.bottom, 6)
+
+                        SettingsRow(
+                            title: "Launch at Login",
+                            subtitle: viewModel.launchAtLoginStatusText,
+                            subtitleIsWarning: viewModel.launchAtLoginNeedsApproval,
+                            systemName: "power"
+                        ) {
+                            HStack(spacing: 8) {
+                                if viewModel.launchAtLoginNeedsApproval {
+                                    Button("Open") {
+                                        viewModel.openLoginItemsSettings()
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.accentColor)
+                                    .help("Open Login Items settings")
+                                }
+
+                                Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+                        }
+
+                        if let executablePathText = viewModel.executablePathText {
+                            NativeSeparator()
+
+                            SettingsRow(
+                                title: executablePathText,
+                                systemName: "terminal",
+                                showsSymbolBackground: false
+                            ) {
+                                EmptyView()
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 392)
+    }
+
+    private var updateNoticeRow: some View {
+        NoticeRow(
+            title: updateMonitor.state.noticeTitle,
+            detail: updateMonitor.state.noticeDetail,
+            systemName: updateMonitor.state.symbolName,
+            tint: updateNoticeColor,
+            actionTitle: updateMonitor.state.actionTitle,
+            isActionEnabled: updateMonitor.canRestartToUpdate
+        ) {
+            updateMonitor.restartToUpdate()
+        }
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        if viewModel.status.isRunning {
+            TrackingClockIcon(accentColor: accentColor)
+                .frame(width: 30, height: 30)
+        } else {
+            ZStack {
+                Circle()
+                    .fill(accentColor.opacity(0.14))
+
+                Image(systemName: headerSymbolName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(accentColor)
+            }
+            .frame(width: 30, height: 30)
+        }
+    }
+
+    private var statusDetailText: String {
+        if let primaryLine = viewModel.status.primaryLine {
+            return primaryLine
+        }
+
+        return viewModel.status.isRunning ? "Tracking" : "Ready"
+    }
+
+    private var primaryActionTitle: String {
+        viewModel.status.isRunning ? "Stop" : "Start"
+    }
+
+    private var primaryActionSymbolName: String {
+        viewModel.status.isRunning ? "stop.fill" : "play.fill"
+    }
+
+    private var primaryActionHelp: String {
+        viewModel.status.isRunning ? "Stop the current Watson frame" : "Start tracking this project"
+    }
+
+    private var canPerformPrimaryAction: Bool {
+        if viewModel.status.isRunning {
+            return viewModel.canStop
+        }
+
+        return viewModel.canStart && !project.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func primaryAction() {
+        if viewModel.status.isRunning {
+            stopTracking()
+        } else {
+            startTracking()
         }
     }
 
@@ -184,12 +420,14 @@ struct MenuBarContentView: View {
                 while normalized.last == "-" {
                     normalized.removeLast()
                 }
+
                 normalized.append(character)
+                normalized.append(" ")
                 continue
             }
 
             if character.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) {
-                if let last = normalized.last, last != "-" && last != "," && last != ";" {
+                if let last = normalized.last, last != "-" && last != "," && last != ";" && last != " " {
                     normalized.append("-")
                 }
                 continue
@@ -201,262 +439,11 @@ struct MenuBarContentView: View {
         return normalized
     }
 
-    private var actionRow: some View {
-        HStack(spacing: 8) {
-            Button("Start", action: startTracking)
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!viewModel.canStart || project.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-            Button("Stop", action: stopTracking)
-                .buttonStyle(.bordered)
-                .disabled(!viewModel.canStop)
-
-            Spacer()
-
-            Button("Refresh", action: refresh)
-                .buttonStyle(.bordered)
-                .disabled(!viewModel.canRefresh)
-        }
-    }
-
-    @ViewBuilder
-    private var todayLogSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Today")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Group {
-                if !viewModel.status.todayReport.summaries.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(viewModel.status.todayReport.summaries) { summary in
-                            Text(summary.displayText)
-                                .font(.system(size: 11))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                } else {
-                    Text("No entries recorded today.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .padding(10)
-            .background(Color.secondary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-    }
-
-    @ViewBuilder
-    private var workWeekSection: some View {
-        DisclosureGroup(isExpanded: $workWeekExpanded) {
-            VStack(alignment: .leading, spacing: 8) {
-                if viewModel.status.workWeekReport.days.isEmpty {
-                    Text("No work week data available.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    ForEach(viewModel.status.workWeekReport.days) { day in
-                        workWeekDay(day)
-
-                        if day.id != viewModel.status.workWeekReport.days.last?.id {
-                            workWeekDaySeparator
-                        }
-                    }
-                }
-            }
-            .padding(.top, 8)
-        } label: {
-            Label("Week", systemImage: "list.bullet")
-                .font(.system(size: 12, weight: .semibold))
-        }
-        .padding(10)
-        .background(Color.secondary.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private func workWeekDay(_ day: WatsonWorkWeekDayReport) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(day.date, format: .dateTime.weekday(.wide))
-                    .font(.system(size: 12, weight: .semibold))
-
-                Text(day.date, format: .dateTime.month(.abbreviated).day())
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-
-                Spacer(minLength: 8)
-
-                Text(workWeekTotalText(for: day.report))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            if !day.report.summaries.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(day.report.summaries) { summary in
-                        Text(summary.displayText)
-                            .font(.system(size: 11))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            } else {
-                Text("No entries recorded.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    private var workWeekDaySeparator: some View {
-        Rectangle()
-            .fill(Color.secondary.opacity(0.18))
-            .frame(height: 1)
-            .padding(.vertical, 2)
-    }
-
-    private var settingsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 12) {
-                Text("Show Timer in Menu Bar")
-                    .font(.system(size: 12, weight: .medium))
-                Spacer()
-                Toggle("Show Timer in Menu Bar", isOn: $showTimerInMenuBar)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-            .frame(maxWidth: .infinity)
-
-            HStack(spacing: 12) {
-                Text("Show Project in Menu Bar")
-                    .font(.system(size: 12, weight: .medium))
-                Spacer()
-                Toggle("Show Project in Menu Bar", isOn: $showProjectInMenuBar)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-            .frame(maxWidth: .infinity)
-
-            HStack(spacing: 12) {
-                Text("Auto Stop")
-                    .font(.system(size: 12, weight: .medium))
-                Spacer()
-                Toggle("Auto Stop", isOn: autoStopBinding)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-            .frame(maxWidth: .infinity)
-
-            if viewModel.autoStopIsOn {
-                HStack(spacing: 12) {
-                    Text("Stop Time")
-                        .font(.system(size: 12, weight: .medium))
-
-                    Spacer()
-
-                    DatePicker("Stop Time", selection: autoStopTimeBinding, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                        .datePickerStyle(.field)
-                        .controlSize(.regular)
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 108, alignment: .trailing)
-                }
-                .frame(maxWidth: .infinity)
-
-                if let statusText = viewModel.autoStopStatusText {
-                    Text(statusText)
-                        .font(.system(size: 11))
-                        .foregroundStyle(viewModel.autoStopStatusIsError ? .orange : .secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            HStack(spacing: 12) {
-                Text("Launch at Login")
-                    .font(.system(size: 12, weight: .medium))
-                Spacer()
-                Toggle("Launch at Login", isOn: launchAtLoginBinding)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-            .frame(maxWidth: .infinity)
-
-            if let statusText = viewModel.launchAtLoginStatusText {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(statusText)
-                        .font(.system(size: 11))
-                        .foregroundStyle(viewModel.launchAtLoginNeedsApproval ? .orange : .secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if viewModel.launchAtLoginNeedsApproval {
-                        Button("Open Login Items") {
-                            viewModel.openLoginItemsSettings()
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
-                    }
-                }
-            }
-        }
-    }
-
-    private var appActionSection: some View {
-        VStack(spacing: 8) {
-            if updateService.showsManualCheckAction {
-                Button("Check for Updates...") {
-                    updateService.checkForUpdates()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.accentColor)
-                .disabled(!updateService.canCheckForUpdates)
-            }
-
-            if let actionTitle = updateService.state.primaryActionTitle, updateService.state.replacesQuitAction {
-                Button {
-                    updateService.performPrimaryAction()
-                } label: {
-                    Label(actionTitle, systemImage: updateService.state.primaryActionSymbolName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .tint(updateNoticeColor)
-                .disabled(!updateService.canPerformPrimaryAction)
-
-                Button {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    Label("Quit Without Updating", systemImage: "power")
-                        .font(.system(size: 11, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Button {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    Label("Quit WatsonMenuBar", systemImage: "power")
-                        .font(.system(size: 12, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-            }
-        }
-    }
-
     private var updateNoticeColor: Color {
-        switch updateService.state {
-        case .error:
+        switch updateMonitor.state {
+        case .restartFailed:
             return .red
-        case .notConfigured, .idle, .checking, .available, .downloading, .downloaded, .readyToRestart, .installing:
+        case .current, .updatedOnDisk:
             return .orange
         }
     }
@@ -493,6 +480,15 @@ struct MenuBarContentView: View {
         }
     }
 
+    private func startTracking(summary: WatsonDailySummary, date: Date) {
+        project = summary.projectName
+        tags = viewModel.tagsInput(for: summary)
+
+        Task {
+            await viewModel.start(summary: summary, on: date)
+        }
+    }
+
     private func stopTracking() {
         Task {
             await viewModel.stop()
@@ -501,6 +497,7 @@ struct MenuBarContentView: View {
 
     private func refresh() {
         Task {
+            updateMonitor.refresh()
             await viewModel.refresh()
         }
     }
@@ -532,5 +529,438 @@ struct MenuBarContentView: View {
         }
 
         return WatsonDurationFormatter.displayString(for: report.totalDurationInSeconds)
+    }
+}
+
+private enum RecentWorkScope: String, CaseIterable, Identifiable {
+    case today
+    case week
+
+    var id: Self {
+        self
+    }
+
+    var title: String {
+        switch self {
+        case .today:
+            return "Today"
+        case .week:
+            return "Week"
+        }
+    }
+}
+
+private struct NativeGroup<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.38), lineWidth: 1)
+            }
+    }
+}
+
+private struct SectionHeader: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+    }
+}
+
+private struct NativeIconButton: View {
+    let systemName: String
+    let accessibilityLabel: String
+    let help: String
+    var isEnabled = true
+    var isSelected = false
+    var keyEquivalent: KeyEquivalent?
+    var modifiers: EventModifiers = []
+    let action: () -> Void
+
+    var body: some View {
+        Group {
+            if let keyEquivalent {
+                content
+                    .keyboardShortcut(keyEquivalent, modifiers: modifiers)
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 24, height: 24)
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+        .background {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+        }
+        .disabled(!isEnabled)
+        .help(help)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+private struct FieldRow<Content: View>: View {
+    let title: String
+    let systemName: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 52, alignment: .leading)
+
+            content
+        }
+    }
+}
+
+private struct SettingsRow<Trailing: View>: View {
+    let title: String
+    var subtitle: String?
+    var subtitleIsWarning = false
+    let systemName: String
+    var showsSymbolBackground = true
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            ZStack {
+                if showsSymbolBackground {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.secondary.opacity(0.1))
+                }
+
+                Image(systemName: systemName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 24, height: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(subtitleIsWarning ? .orange : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            trailing
+        }
+        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+        .padding(.vertical, 6)
+    }
+}
+
+private struct NoticeRow: View {
+    let title: String
+    let detail: String
+    let systemName: String
+    let tint: Color
+    var actionTitle: String?
+    var isActionEnabled = true
+    var action: (() -> Void)?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 20, height: 20)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!isActionEnabled)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.38), lineWidth: 1)
+        }
+    }
+}
+
+private struct SummaryResumeRow: View {
+    let summary: WatsonDailySummary
+    var dateLabel: String?
+    let isEnabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(summary.projectName)
+                            .font(.system(size: 12, weight: .medium))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+
+                        Spacer(minLength: 8)
+
+                        Text(WatsonDurationFormatter.displayString(for: summary.totalDurationInSeconds))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    if let detailText {
+                        Text(detailText)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.45)
+        .accessibilityLabel("Resume \(summary.projectName)")
+        .help("Resume \(summary.projectName)")
+    }
+
+    private var detailText: String? {
+        var parts: [String] = []
+
+        if let dateLabel, !dateLabel.isEmpty {
+            parts.append(dateLabel)
+        }
+
+        if let formattedTagsText, !formattedTagsText.isEmpty {
+            parts.append(formattedTagsText)
+        }
+
+        guard !parts.isEmpty else {
+            return nil
+        }
+
+        return parts.joined(separator: " - ")
+    }
+
+    private var formattedTagsText: String? {
+        let tags = tagTokens(from: summary.tags)
+
+        guard !tags.isEmpty else {
+            return nil
+        }
+
+        return tags.map { "#\($0)" }.joined(separator: " ")
+    }
+
+    private func tagTokens(from text: String?) -> [String] {
+        guard var text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return []
+        }
+
+        if text.hasPrefix("[") && text.hasSuffix("]") {
+            text = String(text.dropFirst().dropLast())
+        }
+
+        return text
+            .split { $0 == "," || $0 == ";" }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+private struct WorkWeekDayGroup: View {
+    let day: WatsonWorkWeekDayReport
+    let totalText: String
+    let canStart: Bool
+    let start: (WatsonDailySummary, Date) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 7) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 15)
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(day.date, format: .dateTime.weekday(.wide))
+                        .font(.system(size: 12, weight: .semibold))
+
+                    Text(day.date, format: .dateTime.month(.abbreviated).day())
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(dayTotalLabel)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color(nsColor: .separatorColor).opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+            if day.report.summaries.isEmpty {
+                EmptyStateRow(text: "No entries recorded.")
+                    .padding(.leading, 22)
+                    .padding(.top, 4)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(day.report.summaries.enumerated()), id: \.element.id) { index, summary in
+                        SummaryResumeRow(
+                            summary: summary,
+                            dateLabel: nil,
+                            isEnabled: canStart
+                        ) {
+                            start(summary, day.date)
+                        }
+
+                        if index < day.report.summaries.count - 1 {
+                            NativeSeparator()
+                        }
+                    }
+                }
+                .padding(.leading, 22)
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    private var dayTotalLabel: String {
+        totalText == "No time" ? totalText : "\(totalText) total"
+    }
+}
+
+private struct EmptyStateRow: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+    }
+}
+
+private struct NativeSeparator: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor).opacity(0.55))
+            .frame(height: 1)
+    }
+}
+
+private struct TrackingClockIcon: View {
+    let accentColor: Color
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let elapsedSeconds = context.date.timeIntervalSinceReferenceDate.rounded(.down)
+            let angleDegrees = elapsedSeconds * 90
+
+            ZStack {
+                Circle()
+                    .fill(accentColor.opacity(0.16))
+
+                Circle()
+                    .stroke(accentColor.opacity(0.35), lineWidth: 1)
+
+                ClockHand(angleDegrees: angleDegrees)
+                    .stroke(accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .padding(5)
+
+                Circle()
+                    .fill(accentColor)
+                    .frame(width: 3, height: 3)
+            }
+            .animation(.easeInOut(duration: 0.2), value: angleDegrees)
+        }
+    }
+}
+
+private struct ClockHand: Shape {
+    var angleDegrees: Double
+
+    var animatableData: Double {
+        get { angleDegrees }
+        set { angleDegrees = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let length = min(rect.width, rect.height) * 0.36
+        let radians = (angleDegrees - 90) * .pi / 180
+        let endPoint = CGPoint(
+            x: center.x + (cos(radians) * length),
+            y: center.y + (sin(radians) * length)
+        )
+
+        var path = Path()
+        path.move(to: center)
+        path.addLine(to: endPoint)
+        return path
     }
 }
