@@ -2,36 +2,24 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @ObservedObject var viewModel: MenuBarViewModel
-    @ObservedObject var updateService: AppUpdateService
+    @ObservedObject var updateMonitor: HomebrewUpdateMonitor
+    @ObservedObject var navigationState: MenuBarNavigationState
     @AppStorage("lastProject") private var project = ""
     @AppStorage("lastTags") private var tags = ""
-    @AppStorage("workWeekExpanded") private var workWeekExpanded = true
     @AppStorage(AppStorageKeys.showTrackingInMenuBar) private var showTimerInMenuBar = true
     @AppStorage(AppStorageKeys.showProjectInMenuBar) private var showProjectInMenuBar = true
+    @State private var selectedMainPage: MenuBarMainPage = .track
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             statusHeader
             Divider()
-            inputSection
-            actionRow
-            todayLogSection
-            workWeekSection
-
-            Divider()
-
-            settingsSection
-
-            if updateService.showsUpdateNotice {
-                Divider()
-                updateNoticeSection
-            }
-
-            Divider()
-
-            appActionSection
+            navigationHeader
+            pageContent
 
             if let footerText = viewModel.footerText {
+                Divider()
+
                 Text(footerText)
                     .font(.system(size: 11))
                     .foregroundStyle(viewModel.footerIsError ? Color.red : .secondary)
@@ -43,17 +31,102 @@ struct MenuBarContentView: View {
         .onAppear(perform: refresh)
     }
 
+    private var navigationHeader: some View {
+        HStack(spacing: 8) {
+            if navigationState.isShowingSettings {
+                Label("Settings", systemImage: "gearshape")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Spacer(minLength: 8)
+
+                Button {
+                    navigationState.hideSettings()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Close settings")
+                .accessibilityLabel("Close settings")
+            } else {
+                Picker("Section", selection: $selectedMainPage) {
+                    Text("Track").tag(MenuBarMainPage.track)
+                    Text("Week").tag(MenuBarMainPage.history)
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pageContent: some View {
+        if navigationState.isShowingSettings {
+            scrollablePage(settingsPage)
+        } else {
+            switch selectedMainPage {
+            case .track:
+                trackPage
+            case .history:
+                scrollablePage(historyPage)
+            }
+        }
+    }
+
+    private func scrollablePage(_ content: some View) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 2)
+        }
+        .frame(maxHeight: 380)
+    }
+
+    private var trackPage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            inputSection
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    todayLogSection
+                    yesterdayLogSection
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 2)
+            }
+            .frame(maxHeight: 220)
+        }
+    }
+
+    private var historyPage: some View {
+        workWeekHistorySection
+    }
+
+    private var settingsPage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button {
+                refresh()
+            } label: {
+                Label("Refresh", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!viewModel.canRefresh)
+
+            settingsSection
+
+            if updateMonitor.state.showsUpdateNotice {
+                updateNoticeSection
+            }
+        }
+    }
+
     private var statusHeader: some View {
         HStack(alignment: .top, spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(accentColor.opacity(0.16))
-
-                Image(systemName: headerSymbolName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(accentColor)
-            }
-            .frame(width: 30, height: 30)
+            statusIcon
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -94,36 +167,50 @@ struct MenuBarContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var statusIcon: some View {
+        if viewModel.status.isRunning {
+            TrackingClockIcon(accentColor: accentColor)
+                .frame(width: 30, height: 30)
+        } else {
+            ZStack {
+                Circle()
+                    .fill(accentColor.opacity(0.16))
+
+                Image(systemName: headerSymbolName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(accentColor)
+            }
+            .frame(width: 30, height: 30)
+        }
+    }
+
     private var updateNoticeSection: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: updateService.state.primaryActionSymbolName)
+            Image(systemName: updateMonitor.state.symbolName)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(updateNoticeColor)
                 .frame(width: 20, height: 20)
 
             VStack(alignment: .leading, spacing: 4) {
-                if let title = updateService.state.noticeTitle {
-                    Text(title)
-                        .font(.system(size: 12, weight: .semibold))
-                }
+                Text(updateMonitor.state.noticeTitle)
+                    .font(.system(size: 12, weight: .semibold))
 
-                if let detail = updateService.state.noticeDetail {
-                    Text(detail)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(updateMonitor.state.noticeDetail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
 
-            if let actionTitle = updateService.state.primaryActionTitle, !updateService.state.replacesQuitAction {
+            if let actionTitle = updateMonitor.state.actionTitle {
                 Button(actionTitle) {
-                    updateService.performPrimaryAction()
+                    updateMonitor.restartToUpdate()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .disabled(!updateService.canPerformPrimaryAction)
+                .disabled(!updateMonitor.canRestartToUpdate)
             }
         }
         .padding(10)
@@ -173,6 +260,8 @@ struct MenuBarContentView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            actionRow
         }
     }
 
@@ -184,12 +273,14 @@ struct MenuBarContentView: View {
                 while normalized.last == "-" {
                     normalized.removeLast()
                 }
+
                 normalized.append(character)
+                normalized.append(" ")
                 continue
             }
 
             if character.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) {
-                if let last = normalized.last, last != "-" && last != "," && last != ";" {
+                if let last = normalized.last, last != "-" && last != "," && last != ";" && last != " " {
                     normalized.append("-")
                 }
                 continue
@@ -214,64 +305,92 @@ struct MenuBarContentView: View {
 
             Spacer()
 
-            Button("Refresh", action: refresh)
+            Button("Settings") {
+                navigationState.toggleSettings()
+            }
                 .buttonStyle(.bordered)
-                .disabled(!viewModel.canRefresh)
         }
     }
 
     @ViewBuilder
     private var todayLogSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Today")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Group {
-                if !viewModel.status.todayReport.summaries.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(viewModel.status.todayReport.summaries) { summary in
-                            Text(summary.displayText)
-                                .font(.system(size: 11))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                } else {
-                    Text("No entries recorded today.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .padding(10)
-            .background(Color.secondary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
+        dailyLogSection(
+            title: "Today",
+            report: viewModel.status.todayReport,
+            date: Date(),
+            emptyText: "No entries recorded today."
+        )
     }
 
     @ViewBuilder
-    private var workWeekSection: some View {
-        DisclosureGroup(isExpanded: $workWeekExpanded) {
-            VStack(alignment: .leading, spacing: 8) {
-                if viewModel.status.workWeekReport.days.isEmpty {
-                    Text("No work week data available.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    ForEach(viewModel.status.workWeekReport.days) { day in
-                        workWeekDay(day)
+    private var yesterdayLogSection: some View {
+        dailyLogSection(
+            title: "Yesterday",
+            report: viewModel.status.yesterdayReport,
+            date: yesterdayDate,
+            emptyText: "No entries recorded yesterday."
+        )
+    }
 
-                        if day.id != viewModel.status.workWeekReport.days.last?.id {
-                            workWeekDaySeparator
+    private func dailyLogSection(
+        title: String,
+        report: WatsonDailyReport,
+        date: Date,
+        emptyText: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            dailyLogCard(report: report, date: date, emptyText: emptyText)
+        }
+    }
+
+    private func dailyLogCard(
+        report: WatsonDailyReport,
+        date: Date,
+        emptyText: String
+    ) -> some View {
+        Group {
+            if !report.summaries.isEmpty {
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(report.summaries) { summary in
+                            summaryResumeButton(summary, date: date)
                         }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 116)
+            } else {
+                Text(emptyText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var workWeekHistorySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if viewModel.status.workWeekReport.days.isEmpty {
+                Text("No work week data available.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ForEach(viewModel.status.workWeekReport.days) { day in
+                    workWeekDay(day)
+
+                    if day.id != viewModel.status.workWeekReport.days.last?.id {
+                        workWeekDaySeparator
                     }
                 }
             }
-            .padding(.top, 8)
-        } label: {
-            Label("Week", systemImage: "list.bullet")
-                .font(.system(size: 12, weight: .semibold))
         }
         .padding(10)
         .background(Color.secondary.opacity(0.08))
@@ -298,9 +417,7 @@ struct MenuBarContentView: View {
             if !day.report.summaries.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(day.report.summaries) { summary in
-                        Text(summary.displayText)
-                            .font(.system(size: 11))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        summaryResumeButton(summary, date: day.date)
                     }
                 }
             } else {
@@ -310,6 +427,28 @@ struct MenuBarContentView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+
+    private func summaryResumeButton(_ summary: WatsonDailySummary, date: Date) -> some View {
+        Button {
+            startTracking(summary: summary, date: date)
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(summary.displayText)
+                    .font(.system(size: 11))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "play.fill")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!viewModel.canStart)
+        .opacity(viewModel.canStart ? 1 : 0.45)
+        .accessibilityLabel("Start \(summary.displayText)")
+        .help("Start \(summary.projectName)")
     }
 
     private var workWeekDaySeparator: some View {
@@ -402,61 +541,21 @@ struct MenuBarContentView: View {
                     }
                 }
             }
-        }
-    }
 
-    private var appActionSection: some View {
-        VStack(spacing: 8) {
-            if updateService.showsManualCheckAction {
-                Button("Check for Updates...") {
-                    updateService.checkForUpdates()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.accentColor)
-                .disabled(!updateService.canCheckForUpdates)
-            }
-
-            if let actionTitle = updateService.state.primaryActionTitle, updateService.state.replacesQuitAction {
-                Button {
-                    updateService.performPrimaryAction()
-                } label: {
-                    Label(actionTitle, systemImage: updateService.state.primaryActionSymbolName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .tint(updateNoticeColor)
-                .disabled(!updateService.canPerformPrimaryAction)
-
-                Button {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    Label("Quit Without Updating", systemImage: "power")
-                        .font(.system(size: 11, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Button {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    Label("Quit WatsonMenuBar", systemImage: "power")
-                        .font(.system(size: 12, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
+            if let executablePathText = viewModel.executablePathText {
+                Text(executablePathText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
     private var updateNoticeColor: Color {
-        switch updateService.state {
-        case .error:
+        switch updateMonitor.state {
+        case .restartFailed:
             return .red
-        case .notConfigured, .idle, .checking, .available, .downloading, .downloaded, .readyToRestart, .installing:
+        case .current, .updatedOnDisk:
             return .orange
         }
     }
@@ -493,6 +592,15 @@ struct MenuBarContentView: View {
         }
     }
 
+    private func startTracking(summary: WatsonDailySummary, date: Date) {
+        project = summary.projectName
+        tags = viewModel.tagsInput(for: summary)
+
+        Task {
+            await viewModel.start(summary: summary, on: date)
+        }
+    }
+
     private func stopTracking() {
         Task {
             await viewModel.stop()
@@ -501,6 +609,7 @@ struct MenuBarContentView: View {
 
     private func refresh() {
         Task {
+            updateMonitor.refresh()
             await viewModel.refresh()
         }
     }
@@ -532,5 +641,61 @@ struct MenuBarContentView: View {
         }
 
         return WatsonDurationFormatter.displayString(for: report.totalDurationInSeconds)
+    }
+
+    private var yesterdayDate: Date {
+        Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+    }
+}
+
+private struct TrackingClockIcon: View {
+    let accentColor: Color
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let elapsedSeconds = context.date.timeIntervalSinceReferenceDate.rounded(.down)
+            let angleDegrees = elapsedSeconds * 90
+
+            ZStack {
+                Circle()
+                    .fill(accentColor.opacity(0.16))
+
+                Circle()
+                    .stroke(accentColor.opacity(0.35), lineWidth: 1)
+
+                ClockHand(angleDegrees: angleDegrees)
+                    .stroke(accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .padding(5)
+
+                Circle()
+                    .fill(accentColor)
+                    .frame(width: 3, height: 3)
+            }
+            .animation(.easeInOut(duration: 0.2), value: angleDegrees)
+        }
+    }
+}
+
+private struct ClockHand: Shape {
+    var angleDegrees: Double
+
+    var animatableData: Double {
+        get { angleDegrees }
+        set { angleDegrees = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let length = min(rect.width, rect.height) * 0.36
+        let radians = (angleDegrees - 90) * .pi / 180
+        let endPoint = CGPoint(
+            x: center.x + (cos(radians) * length),
+            y: center.y + (sin(radians) * length)
+        )
+
+        var path = Path()
+        path.move(to: center)
+        path.addLine(to: endPoint)
+        return path
     }
 }

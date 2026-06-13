@@ -131,15 +131,17 @@ final class MenuBarViewModel: ObservableObject {
         switch status.state {
         case .unavailable, .error:
             return status.message
-        case .running, .idle:
-            return status.executablePath.map { "Using \($0)" }
-        case .loading:
+        case .running, .idle, .loading:
             return nil
         }
     }
 
     var footerIsError: Bool {
         inlineMessage != nil || status.state == .unavailable || status.state == .error
+    }
+
+    var executablePathText: String? {
+        status.executablePath.map { "Using \($0)" }
     }
 
     var canEditInputs: Bool {
@@ -194,6 +196,24 @@ final class MenuBarViewModel: ObservableObject {
     }
 
     func start(project: String, tagsInput: String) async {
+        await start(project: project, tagsInput: tagsInput, baselineMode: .continueToday)
+    }
+
+    func start(summary: WatsonDailySummary, on date: Date) async {
+        let baselineMode: StartBaselineMode = Calendar.current.isDateInToday(date) ? .continueToday : .startFromZero
+        await start(project: summary.projectName, tagsInput: tagsInput(for: summary), baselineMode: baselineMode)
+    }
+
+    func tagsInput(for summary: WatsonDailySummary) -> String {
+        tagsInput(from: summary.tags)
+    }
+
+    private enum StartBaselineMode {
+        case continueToday
+        case startFromZero
+    }
+
+    private func start(project: String, tagsInput: String, baselineMode: StartBaselineMode) async {
         guard !isWorking else {
             return
         }
@@ -206,16 +226,23 @@ final class MenuBarViewModel: ObservableObject {
         }
 
         let normalizedTags = service.normalizedTags(from: tagsInput)
-        let existingTotal = dailyTotalSeconds(
-            project: trimmedProject,
-            tags: normalizedTags,
-            in: status.todayReport
-        )
+        let existingTotal: Int
+        switch baselineMode {
+        case .continueToday:
+            existingTotal = dailyTotalSeconds(
+                project: trimmedProject,
+                tags: normalizedTags,
+                in: status.todayReport
+            )
+        case .startFromZero:
+            existingTotal = 0
+        }
 
         activeSessionDailyBaseline = ActiveSessionDailyBaseline(
             project: trimmedProject,
             tags: normalizedTags,
-            previousTotalInSeconds: existingTotal
+            previousTotalInSeconds: existingTotal,
+            includesReportedDailyTotal: baselineMode == .continueToday
         )
 
         isWorking = true
@@ -238,6 +265,7 @@ final class MenuBarViewModel: ObservableObject {
         let project: String
         let tags: [String]
         let previousTotalInSeconds: Int
+        let includesReportedDailyTotal: Bool
     }
 
     private func dailyTotalSeconds(project: String, tags: [String], in report: WatsonDailyReport) -> Int {
@@ -280,6 +308,20 @@ final class MenuBarViewModel: ObservableObject {
             .map { Int($0.rounded(.down)) }
 
         var candidates: [Int] = []
+        if
+            let activeSessionDailyBaseline,
+            activeSessionDailyBaseline.project == project,
+            tagIdentity(activeSessionDailyBaseline.tags) == tagIdentity(updatedStatus.tags)
+        {
+            if !activeSessionDailyBaseline.includesReportedDailyTotal {
+                return TimeInterval(activeSessionDailyBaseline.previousTotalInSeconds + (currentSessionSeconds ?? 0))
+            }
+
+            candidates.append(activeSessionDailyBaseline.previousTotalInSeconds + (currentSessionSeconds ?? 0))
+        } else {
+            activeSessionDailyBaseline = nil
+        }
+
         let reportedDailyTotal = dailyTotalSeconds(
             project: project,
             tags: updatedStatus.tags,
@@ -288,16 +330,6 @@ final class MenuBarViewModel: ObservableObject {
 
         if reportedDailyTotal > 0 {
             candidates.append(reportedDailyTotal)
-        }
-
-        if
-            let activeSessionDailyBaseline,
-            activeSessionDailyBaseline.project == project,
-            tagIdentity(activeSessionDailyBaseline.tags) == tagIdentity(updatedStatus.tags)
-        {
-            candidates.append(activeSessionDailyBaseline.previousTotalInSeconds + (currentSessionSeconds ?? 0))
-        } else {
-            activeSessionDailyBaseline = nil
         }
 
         if let bestCandidate = candidates.max() {
@@ -391,10 +423,18 @@ final class MenuBarViewModel: ObservableObject {
     }
 
     private var autocompleteReports: [WatsonDailyReport] {
-        [status.todayReport] + status.workWeekReport.days.map(\.report)
+        [status.todayReport, status.yesterdayReport] + status.workWeekReport.days.map(\.report)
     }
 
     private func tagCandidates(from tagsText: String?) -> [String] {
+        tagsInputTags(from: tagsText)
+    }
+
+    private func tagsInput(from tagsText: String?) -> String {
+        tagsInputTags(from: tagsText).joined(separator: ", ")
+    }
+
+    private func tagsInputTags(from tagsText: String?) -> [String] {
         guard var text = tagsText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
             return []
         }
