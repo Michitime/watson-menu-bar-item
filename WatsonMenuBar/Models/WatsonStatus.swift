@@ -14,6 +14,7 @@ struct WatsonStatus: Equatable {
     let tags: [String]
     let elapsed: String?
     let todayReport: WatsonDailyReport
+    let yesterdayReport: WatsonDailyReport
     let workWeekReport: WatsonWorkWeekReport
     let message: String?
     let executablePath: String?
@@ -24,6 +25,7 @@ struct WatsonStatus: Equatable {
         tags: [],
         elapsed: nil,
         todayReport: WatsonDailyReport(entries: []),
+        yesterdayReport: WatsonDailyReport(entries: []),
         workWeekReport: .empty,
         message: "Checking Watson...",
         executablePath: nil
@@ -34,6 +36,7 @@ struct WatsonStatus: Equatable {
         tags: [String],
         elapsed: String?,
         todayReport: WatsonDailyReport,
+        yesterdayReport: WatsonDailyReport,
         workWeekReport: WatsonWorkWeekReport,
         executablePath: String
     ) -> WatsonStatus {
@@ -43,6 +46,7 @@ struct WatsonStatus: Equatable {
             tags: tags,
             elapsed: elapsed,
             todayReport: todayReport,
+            yesterdayReport: yesterdayReport,
             workWeekReport: workWeekReport,
             message: nil,
             executablePath: executablePath
@@ -56,6 +60,7 @@ struct WatsonStatus: Equatable {
             tags: [],
             elapsed: nil,
             todayReport: WatsonDailyReport(entries: []),
+            yesterdayReport: WatsonDailyReport(entries: []),
             workWeekReport: .empty,
             message: nil,
             executablePath: executablePath
@@ -69,6 +74,7 @@ struct WatsonStatus: Equatable {
             tags: [],
             elapsed: nil,
             todayReport: WatsonDailyReport(entries: []),
+            yesterdayReport: WatsonDailyReport(entries: []),
             workWeekReport: .empty,
             message: "Install Watson CLI and make sure `watson` is available in PATH, /opt/homebrew/bin, or /usr/local/bin.",
             executablePath: nil
@@ -82,6 +88,7 @@ struct WatsonStatus: Equatable {
             tags: [],
             elapsed: nil,
             todayReport: WatsonDailyReport(entries: []),
+            yesterdayReport: WatsonDailyReport(entries: []),
             workWeekReport: .empty,
             message: message,
             executablePath: executablePath

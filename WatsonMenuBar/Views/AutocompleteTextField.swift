@@ -30,9 +30,6 @@ struct AutocompleteTextField: NSViewRepresentable {
     func updateNSView(_ textField: NSTextField, context: Context) {
         context.coordinator.parent = self
 
-        textField.placeholderString = placeholder
-        textField.isEnabled = isEnabled
-
         if textField.stringValue != text {
             textField.stringValue = text
         }
@@ -51,7 +48,15 @@ extension AutocompleteTextField {
             self.parent = parent
         }
 
+        func control(_ control: NSControl, textShouldBeginEditing fieldEditor: NSText) -> Bool {
+            parent.isEnabled
+        }
+
         func controlTextDidChange(_ notification: Notification) {
+            guard parent.isEnabled else {
+                return
+            }
+
             guard let textField = notification.object as? NSTextField else {
                 return
             }
@@ -64,6 +69,10 @@ extension AutocompleteTextField {
             textView: NSTextView,
             doCommandBy commandSelector: Selector
         ) -> Bool {
+            guard parent.isEnabled else {
+                return true
+            }
+
             switch commandSelector {
             case #selector(NSResponder.insertTab(_:)):
                 return complete(control: control, textView: textView)
@@ -175,7 +184,7 @@ extension AutocompleteTextField {
                 let character = nsText.character(at: candidateLocation)
 
                 if isTagSeparator(character) {
-                    return candidateLocation + 1
+                    return firstTokenCharacterLocation(in: nsText, after: candidateLocation)
                 }
             }
 
@@ -202,6 +211,25 @@ extension AutocompleteTextField {
 
         private func isTagSeparator(_ character: unichar) -> Bool {
             character == CharacterCode.comma || character == CharacterCode.semicolon
+        }
+
+        private func firstTokenCharacterLocation(in text: NSString, after separatorLocation: Int) -> Int {
+            var location = separatorLocation + 1
+
+            while location < text.length {
+                let character = text.character(at: location)
+
+                guard
+                    let scalar = UnicodeScalar(character),
+                    CharacterSet.whitespacesAndNewlines.contains(scalar)
+                else {
+                    break
+                }
+
+                location += 1
+            }
+
+            return location
         }
 
         private func submit(control: NSControl, textView: NSTextView) {
